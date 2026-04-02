@@ -225,7 +225,7 @@ const Dashboard = () => {
       const productMap = new Map();
 
       resData.rows.forEach(r => {
-         const promo = activePromos.find(p => p.name === r.product_name);
+         const promo = activePromos.find(p => p.name.toLowerCase() === r.product_name.toLowerCase());
          if (promo) {
             const multiplierCM = Number(r.current_month || 0);
             const multiplierPM = Number(r.previous_month || 0);

@@ -3,6 +3,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Package, X, Loader2, Edit2 } from 'lucide-react';
 import { getPromotions, savePromotions } from '../utils/promotions';
 
+const MIGRATION_DATA = [
+  { name: "Փաթեթավորված արևածաղիկ և սուրճի միքս N1", products: [{ name: 'Փաթեթավորված արևածաղիկ "Oտ Մարտինա" աղի 100գր', quantity: 10 }, { name: "Սուրճ աղացած ռոբուստա 100% պրեմիում 100գր", quantity: 5 }] },
+  { name: "Փաթեթավորված արևածաղիկ և սուրճի միքս N2", products: [{ name: 'Փաթեթավորված արևածաղիկ "Oտ Մարտինա" 100գր', quantity: 10 }, { name: "Սուրճ աղացած ռոբուստա 100% պրեմիում 100գր", quantity: 5 }] },
+  { name: "Փաթեթավորված արևածաղիկ և սուրճի միքս N3", products: [{ name: 'Փաթեթավորված արևածաղիկ "Oտ Մարտինա" աղի 100գր', quantity: 5 }, { name: 'Փաթեթավորված արևածաղիկ "Oտ Մարտինա" 100գր', quantity: 5 }, { name: "Սուրճ աղացած ռոբուստա 100% պրեմիում 100գր", quantity: 5 }] },
+  { name: "Փաթեթավորված արևածաղիկ և սուրճի միքս N4", products: [{ name: 'Փաթեթավորված արևածաղիկ "Oտ Մարտինա" աղի 100գր', quantity: 10 }, { name: "Սուրճ աղացած արաբիկա 50% - ռոբուստա 50% պրեմիում 100գր", quantity: 5 }] },
+  { name: "Փաթեթավորված արևածաղիկ և սուրճի միքս N5", products: [{ name: 'Փաթեթավորված արևածաղիկ "Oտ Մարտինա" 100գր', quantity: 5 }, { name: "Սուրճ աղացած արաբիկա 50% - ռոբուստա 50% պրեմիում 100գր", quantity: 5 }] },
+  { name: "Փաթեթավորված արևածաղիկ և սուրճի միքս N6", products: [{ name: 'Փաթեթավորված արևածաղիկ "Oտ Մարտինա" աղի 100գր', quantity: 5 }, { name: 'Փաթեթավորված արևածաղիկ "Oտ Մարտինա" 100գր', quantity: 5 }, { name: "Սուրճ աղացած արաբիկա 50% - ռոբուստա 50% պրեմիում 100գր", quantity: 5 }] },
+  { name: "Բոված արևածաղիկ և մակարոնի միքս մինի N4", products: [{ name: 'արևածաղիկ "Oտ Մարտինա" 3 կգ Աղի', quantity: 2 }, { name: "Վերմիշել 400 գր N 1", quantity: 5 }] },
+  { name: "Բոված արևածաղիկ և մակարոնի միքս մինի N5", products: [{ name: 'արևածաղիկ "Oտ Մարտինա" 3 կգ', quantity: 2 }, { name: "Վերմիշել 400 գր N 1", quantity: 5 }] },
+  { name: "Բոված արևածաղիկ և մակարոնի միքս մինի N6", products: [{ name: 'արևածաղիկ "Oտ Մարտինա" 3 կգ', quantity: 1 }, { name: "Վերմիշել 400 գր N 1", quantity: 2 }] },
+  { name: "Բոված արևածաղիկ և մակարոնի միքս մինի N7", products: [{ name: 'արևածաղիկ "Oտ Մարտինա" 3 կգ Աղի', quantity: 1 }, { name: "Վերմիշել 400 գր N 1", quantity: 2 }] },
+  { name: "Բոված արևածաղիկ և մակարոնի միքս մինի N8", products: [{ name: 'արևածաղիկ "Oտ Մարտինա" 3 կգ Աղի', quantity: 3 }, { name: "Վերմիշել 400 գր N 1", quantity: 8 }] },
+  { name: "Բոված արևածաղիկ և մակարոնի միքս մինի N9", products: [{ name: 'արևածաղիկ "Oտ Մարտինա" 3 կգ', quantity: 3 }, { name: "Վերմիշել 400 գր N 1", quantity: 8 }] },
+  { name: "Բոված արևածաղիկ զոլավոր և մակարոնի միքս մինի N2", products: [{ name: "Բոված արևածաղիկ զոլավոր 2 կգ Աղի", quantity: 2 }, { name: "Վերմիշել 400 գր N 2", quantity: 4 }] },
+  { name: "Բոված արևածաղիկ զոլավոր և մակարոնի միքս մինի N3", products: [{ name: "Բոված արևածաղիկ զոլավոր 2 կգ Աղի", quantity: 1 }, { name: "Վերմիշել 400 գր N 2", quantity: 5 }] },
+  { name: "Բոված արևածաղիկ զոլավոր և մակարոնի միքս մինի N4", products: [{ name: "Բոված արևածաղիկ զոլավոր 2 կգ Աղի", quantity: 3 }, { name: "Վերմիշել 400 գր N 2", quantity: 7 }] }
+];
+
 const Promotions = () => {
   const [promotions, setPromotions] = useState([]);
   const [productsList, setProductsList] = useState([]);
@@ -47,6 +65,48 @@ const Promotions = () => {
     } finally {
       setIsLoadingProducts(false);
     }
+  };
+
+  const handleMigrate = async () => {
+    if (!window.confirm("Ավելացնել բոլոր նոր ակցիաները՞")) return;
+    
+    const existingNames = new Set(promotions.map(p => p.name.toLowerCase()));
+    const toAdd = MIGRATION_DATA.filter(m => !existingNames.has(m.name.toLowerCase()));
+    
+    if (toAdd.length === 0) return alert("Բոլոր ակցիաներն արդեն առկա են:");
+    
+    const newItems = [];
+    const notFound = [];
+
+    toAdd.forEach((m, i) => {
+       const mappedProducts = m.products.map(p => {
+          const liveProd = productsList.find(lp => lp.name.toLowerCase() === p.name.toLowerCase());
+          if (!liveProd) {
+             notFound.push(`"${p.name}" (Акация: ${m.name})`);
+             return null;
+          }
+          return { productId: liveProd.id, productName: liveProd.name, quantity: p.quantity };
+       }).filter(p => p !== null);
+
+       if (mappedProducts.length > 0) {
+          newItems.push({
+             ...m,
+             id: `mig_${Date.now()}_${i}`,
+             description: "Ավտոմատ ներմուծված",
+             products: mappedProducts
+          });
+       }
+    });
+    
+    if (notFound.length > 0) {
+       console.warn("Products not found during migration:", notFound);
+       alert(`Որոշ ապրանքներ չեն գտնվել բազայում (տես console): Ավելացվել է միայն առկա ապրանքներով ${newItems.length} ակցիա:`);
+    }
+
+    const updated = [...promotions, ...newItems];
+    setPromotions(updated);
+    await savePromotions(updated);
+    if (newItems.length > 0) alert(`Ավելացվեց ${newItems.length} նոր ակցիա:`);
   };
 
   const handleSavePromo = async () => {
@@ -122,13 +182,18 @@ const Promotions = () => {
           <h1 className="title-font" style={{ fontSize: '28px', fontWeight: 700, margin: 0 }}>Ակցիաներ</h1>
           <p className="text-secondary text-sm">Ունենք ընդհանուր <span className="font-bold text-blue">{promotions.length}</span> ակցիա</p>
         </div>
-        <button 
-          className="btn btn-primary" 
-          onClick={openNewModal}
-        >
-          <Plus size={20} />
-          <span>Ստեղծել Ակցիա</span>
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }} onClick={handleMigrate}>
+            Migrate
+          </button>
+          <button 
+            className="btn btn-primary" 
+            onClick={openNewModal}
+          >
+            <Plus size={20} />
+            <span>Ստեղծել Ակցիա</span>
+          </button>
+        </div>
       </div>
 
       {/* Promotions List */}
