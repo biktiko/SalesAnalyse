@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Loader2, Search, CheckCircle2, X, Calendar, Filter, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -111,6 +112,15 @@ const Dashboard = () => {
   // Modal State
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [modalData, setModalData] = useState([]);
   const [chartRange, setChartRange] = useState('30days'); // 30days, 90days, 180days, 1year
   const [chartGroup, setChartGroup] = useState('day'); // day, week, month
@@ -513,8 +523,8 @@ const Dashboard = () => {
         mainNumber: totalCurrent,
         subtext: "Դիտարկվում է " + formatNum(count) + " պրոդուկտ",
         stats: [
-          { label: "Նախ. ամսվա համեմատ " + formatNum(totalPrevMonth), trend: trendMonth },
-          { label: "Նախ. տարվա համեմատ " + formatNum(totalPrevYear), trend: trendYear }
+          { label: "Նախորդ ամսվա համեմատ " + formatNum(totalPrevMonth), trend: trendMonth },
+          { label: "Նախորդ տարվա համեմատ " + formatNum(totalPrevYear), trend: trendYear }
         ]
       };
     } 
@@ -541,11 +551,19 @@ const Dashboard = () => {
       </AnimatePresence>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto pb-20 md:pb-10 relative">
-        <div className="flex justify-end mb-6">
-          <button onClick={() => fetchAnalytics(true)} disabled={progress > 0} className="btn" style={{ background: 'var(--bg-secondary)', padding: '10px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {progress > 0 ? <Loader2 size={16} className="animate-spin" /> : <Activity size={16} className="text-blue" />} Թարմացնել
-          </button>
-        </div>
+        {!isMobile && (
+           <div className="flex justify-end mb-6">
+             <button onClick={() => fetchAnalytics(true)} disabled={progress > 0} className="btn" style={{ background: 'var(--bg-secondary)', padding: '10px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+               {progress > 0 ? <Loader2 size={16} className="animate-spin" /> : <Activity size={16} className="text-blue" />} Թարմացնել
+             </button>
+           </div>
+        )}
+        {isMobile && document.getElementById('mobile-header-actions') && createPortal(
+           <button onClick={() => fetchAnalytics(true)} disabled={progress > 0} className="flex items-center justify-center p-2 rounded-full bg-transparent border-none text-secondary hover:text-primary">
+              {progress > 0 ? <Loader2 size={24} className="animate-spin text-blue" /> : <Activity size={24} />}
+           </button>,
+           document.getElementById('mobile-header-actions')
+        )}
 
         {error ? (
           <div style={{ padding: '24px', borderRadius: '20px', background: 'rgba(255, 69, 58, 0.08)', border: '1px solid var(--accent-red)', display: 'flex', gap: '14px', color: 'var(--accent-red)' }}>
@@ -573,27 +591,27 @@ const Dashboard = () => {
 
          <AnimatePresence>
             {isFilterModalOpen && (
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setIsFilterModalOpen(false)}>
-                  <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-primary)', width: '100%', maxWidth: '440px', borderRadius: '28px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', maxHeight: '90vh' }}>
-                     <div style={{ padding: '20px 28px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)' }}>
-                        <h2 className="title-font" style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-primary)' }}>Ֆիլտրներ</h2>
-                        <button onClick={() => setIsFilterModalOpen(false)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} strokeWidth={2.5} /></button>
+               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '8px' : '16px' }} onClick={() => setIsFilterModalOpen(false)}>
+                  <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-primary)', width: '100%', maxWidth: '440px', borderRadius: isMobile ? '24px' : '28px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', maxHeight: isMobile ? '92vh' : '90vh' }}>
+                     <div style={{ padding: isMobile ? '16px 20px 12px' : '20px 28px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)' }}>
+                        <h2 className="title-font" style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '900', color: 'var(--text-primary)' }}>Ֆիլտրներ</h2>
+                        <button onClick={() => setIsFilterModalOpen(false)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: isMobile ? '28px' : '32px', height: isMobile ? '28px' : '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} strokeWidth={2.5} /></button>
                      </div>
-                     <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'auto' }}>
+                     <div style={{ padding: isMobile ? '16px 20px' : '20px 28px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', flex: 1, overflowY: 'auto' }}>
                         <div>
-                           <label style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} className="text-blue" />Ժամանակահատված 1 <span style={{ color: 'var(--accent-red)' }}>*</span></label>
-                           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                              <div style={{ flex: 1, position: 'relative' }}><span style={{ position: 'absolute', top: '-10px', left: '16px', background: 'var(--bg-primary)', padding: '0 4px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Սկսած...</span><input type="date" value={draftFilters.periodAStart} onChange={e => setDraftFilters({...draftFilters, periodAStart: e.target.value})} style={{ width: '100%', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '14px 16px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }} /></div>
-                              <span style={{ color: 'var(--border-color)', fontWeight: 'bold' }}>-</span>
-                              <div style={{ flex: 1, position: 'relative' }}><span style={{ position: 'absolute', top: '-10px', left: '16px', background: 'var(--bg-primary)', padding: '0 4px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Մինչև...</span><input type="date" value={draftFilters.periodAEnd} onChange={e => setDraftFilters({...draftFilters, periodAEnd: e.target.value})} style={{ width: '100%', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '14px 16px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }} /></div>
+                           <label style={{ fontSize: isMobile ? '14px' : '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: isMobile ? '10px' : '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} className="text-blue" />Ժամանակահատված 1 <span style={{ color: 'var(--accent-red)' }}>*</span></label>
+                           <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center">
+                              <div style={{ flex: 1, position: 'relative' }}><span style={{ position: 'absolute', top: '-10px', left: '16px', background: 'var(--bg-primary)', padding: '0 4px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Սկսած...</span><input type="date" value={draftFilters.periodAStart} onChange={e => setDraftFilters({...draftFilters, periodAStart: e.target.value})} style={{ width: '100%', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '16px', padding: isMobile ? '12px 14px' : '14px 16px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }} /></div>
+                              <span className="hidden sm:inline" style={{ color: 'var(--border-color)', fontWeight: 'bold' }}>-</span>
+                              <div style={{ flex: 1, position: 'relative' }}><span style={{ position: 'absolute', top: '-10px', left: '16px', background: 'var(--bg-primary)', padding: '0 4px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Մինչև...</span><input type="date" value={draftFilters.periodAEnd} onChange={e => setDraftFilters({...draftFilters, periodAEnd: e.target.value})} style={{ width: '100%', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '16px', padding: isMobile ? '12px 14px' : '14px 16px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }} /></div>
                            </div>
                         </div>
-                        <div style={{ paddingTop: '20px', borderTop: '1px dashed var(--border-color)' }}>
-                           <label style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} style={{ color: 'var(--accent-orange)' }} />Ժամանակահատված 2</label>
-                           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                              <div style={{ flex: 1, position: 'relative' }}><span style={{ position: 'absolute', top: '-10px', left: '16px', background: 'var(--bg-primary)', padding: '0 4px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Սկսած...</span><input type="date" value={draftFilters.periodBStart} onChange={e => setDraftFilters({...draftFilters, periodBStart: e.target.value})} style={{ width: '100%', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '14px 16px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }} /></div>
-                              <span style={{ color: 'var(--border-color)', fontWeight: 'bold' }}>-</span>
-                              <div style={{ flex: 1, position: 'relative' }}><span style={{ position: 'absolute', top: '-10px', left: '16px', background: 'var(--bg-primary)', padding: '0 4px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Մինչև...</span><input type="date" value={draftFilters.periodBEnd} onChange={e => setDraftFilters({...draftFilters, periodBEnd: e.target.value})} style={{ width: '100%', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '14px 16px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }} /></div>
+                        <div style={{ paddingTop: isMobile ? '12px' : '20px', borderTop: '1px dashed var(--border-color)' }}>
+                           <label style={{ fontSize: isMobile ? '14px' : '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: isMobile ? '10px' : '14px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} style={{ color: 'var(--accent-orange)' }} />Ժամանակահատված 2</label>
+                           <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center">
+                              <div style={{ flex: 1, position: 'relative' }}><span style={{ position: 'absolute', top: '-10px', left: '16px', background: 'var(--bg-primary)', padding: '0 4px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Սկսած...</span><input type="date" value={draftFilters.periodBStart} onChange={e => setDraftFilters({...draftFilters, periodBStart: e.target.value})} style={{ width: '100%', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '16px', padding: isMobile ? '12px 14px' : '14px 16px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }} /></div>
+                              <span className="hidden sm:inline" style={{ color: 'var(--border-color)', fontWeight: 'bold' }}>-</span>
+                              <div style={{ flex: 1, position: 'relative' }}><span style={{ position: 'absolute', top: '-10px', left: '16px', background: 'var(--bg-primary)', padding: '0 4px', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Մինչև...</span><input type="date" value={draftFilters.periodBEnd} onChange={e => setDraftFilters({...draftFilters, periodBEnd: e.target.value})} style={{ width: '100%', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '16px', padding: isMobile ? '12px 14px' : '14px 16px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }} /></div>
                            </div>
                         </div>
                         <AnimatePresence>
@@ -611,18 +629,18 @@ const Dashboard = () => {
                               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
                                  <div style={{ paddingTop: '4px', marginTop: '4px' }}>
                                     <label style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '12px', display: 'block', textAlign: 'center' }}>Համեմատել</label>
-                                    <div style={{ display: 'flex', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
-                                       <button onClick={() => setDraftFilters({...draftFilters, compareType: 'total'})} style={{ flex: 1, padding: '10px 0', borderRadius: '12px', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s', background: draftFilters.compareType === 'total' ? 'var(--accent-blue)' : 'transparent', color: draftFilters.compareType === 'total' ? 'white' : 'var(--text-secondary)', border: 'none' }}>Ամբողջ Քանակությամբ</button>
-                                       <button onClick={() => setDraftFilters({...draftFilters, compareType: 'avg_day'})} style={{ flex: 1, padding: '10px 0', borderRadius: '12px', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s', background: draftFilters.compareType === 'avg_day' ? 'var(--accent-blue)' : 'transparent', color: draftFilters.compareType === 'avg_day' ? 'white' : 'var(--text-secondary)', border: 'none' }}>Միջինում 1 Օրում</button>
+                                    <div className="flex flex-col sm:flex-row bg-[var(--bg-secondary)] p-1 rounded-2xl border border-[var(--border-color)] gap-1 w-full box-border">
+                                       <button onClick={() => setDraftFilters({...draftFilters, compareType: 'total'})} style={{ flex: '1 1 auto', width: '100%', padding: '12px 8px', borderRadius: '12px', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s', background: draftFilters.compareType === 'total' ? 'var(--accent-blue)' : 'transparent', color: draftFilters.compareType === 'total' ? 'white' : 'var(--text-secondary)', border: 'none', lineHeight: '1.2' }}>Ամբողջ Քանակությամբ</button>
+                                       <button onClick={() => setDraftFilters({...draftFilters, compareType: 'avg_day'})} style={{ flex: '1 1 auto', width: '100%', padding: '12px 8px', borderRadius: '12px', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s', background: draftFilters.compareType === 'avg_day' ? 'var(--accent-blue)' : 'transparent', color: draftFilters.compareType === 'avg_day' ? 'white' : 'var(--text-secondary)', border: 'none', lineHeight: '1.2' }}>Միջինում 1 Օրում</button>
                                     </div>
                                  </div>
                               </motion.div>
                            )}
                         </AnimatePresence>
                      </div>
-                     <div style={{ padding: '20px 28px', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '16px' }}>
-                        <button onClick={() => { clearFilters(); setIsFilterModalOpen(false); }} style={{ flex: 1, padding: '16px', borderRadius: '18px', fontWeight: '900', fontSize: '15px', background: 'rgba(255, 69, 58, 0.1)', color: 'var(--accent-red)', border: 'none' }}>Մաքրել</button>
-                        <button onClick={applyFilters} disabled={draftFilters.periodAStart && !draftFilters.periodAEnd} style={{ flex: 2, padding: '16px', borderRadius: '18px', fontWeight: '900', fontSize: '15px', background: 'var(--accent-blue)', color: 'white', border: 'none', opacity: (draftFilters.periodAStart && !draftFilters.periodAEnd) ? 0.5 : 1 }}>Կիրառել Ֆիլտրը</button>
+                     <div style={{ padding: isMobile ? '12px 20px' : '20px 28px', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '12px' }}>
+                        <button onClick={() => { clearFilters(); setIsFilterModalOpen(false); }} style={{ flex: 1, padding: isMobile ? '12px' : '16px', borderRadius: '18px', fontWeight: '900', fontSize: isMobile ? '14px' : '15px', background: 'rgba(255, 69, 58, 0.1)', color: 'var(--accent-red)', border: 'none' }}>Մաքրել</button>
+                        <button onClick={applyFilters} disabled={draftFilters.periodAStart && !draftFilters.periodAEnd} style={{ flex: 2, padding: isMobile ? '12px' : '16px', borderRadius: '18px', fontWeight: '900', fontSize: isMobile ? '14px' : '15px', background: 'var(--accent-blue)', color: 'white', border: 'none', opacity: (draftFilters.periodAStart && !draftFilters.periodAEnd) ? 0.5 : 1 }}>Կիրառել</button>
                      </div>
                   </motion.div>
                </motion.div>
@@ -665,7 +683,7 @@ const Dashboard = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                {loading && data.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary"><p>Բեռնվում են տվյալները...</p></div>) : filteredData.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary glass-card" style={{ borderRadius: '24px' }}><CheckCircle2 size={40} className="mb-4 text-green" /><p className="font-bold text-lg">Տվյալներ չեն գտնվել / Դատարկ է</p></div>) : (
                   filteredData.map((item) => (
-                     <div key={item.id} onClick={() => fetchProductGraph(item, chartRange)} className="glass-card hover-lift cursor-pointer" style={{ padding: '24px', borderRadius: '24px', display: 'flex', flexDirection: 'column', flex: '1 1 calc(50% - 16px)', minWidth: '320px', maxWidth: '100%' }}><h3 style={{ fontSize: '18px', fontWeight: 'bold', lineHeight: '1.4', color: 'var(--text-primary)', marginBottom: '24px' }}>{item.name}</h3>
+                     <div key={item.id} onClick={() => fetchProductGraph(item, chartRange)} className="glass-card hover-lift cursor-pointer" style={{ padding: '24px', borderRadius: '24px', display: 'flex', flexDirection: 'column', flex: '1 1 calc(50% - 16px)', minWidth: '320px', maxWidth: '100%' }}><h3 style={{ fontSize: '16px', fontWeight: 'bold', lineHeight: '1.4', color: 'var(--text-primary)', marginBottom: '24px' }}>{item.name}</h3>
                         <div className="flex flex-col gap-6">
                            <div className="flex justify-between items-center bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-color)]">
                               <div className="flex flex-col">
@@ -681,7 +699,7 @@ const Dashboard = () => {
 
                            {/* Previous Period */}
                            {(!hasActiveFilters || (hasActiveFilters && filters.periodBStart && filters.periodBEnd)) && (
-                              <div className="flex justify-between items-center px-2">
+                              <div className="flex justify-between items-end px-2 mt-2">
                                  <div className="flex flex-col">
                                     <span className="text-secondary text-[13px] font-semibold mb-1">
                                        {(hasActiveFilters && filters.periodBStart && filters.periodBEnd) ? formatDateRange(filters.periodBStart, filters.periodBEnd) : 'Նախորդ Ամիս'}
@@ -690,23 +708,27 @@ const Dashboard = () => {
                                        <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.previous)}</span></span>
                                        <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgB || 0))}</span></span>
                                     </div>
-                                    <span style={{ fontSize: '16px', fontWeight: '900', color: item.diffMonth > 0 ? 'var(--accent-green)' : (item.diffMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)') }}>{item.diffMonth > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffMonth || 0)) : formatNum(Math.round(item.diffMonth || 0))}</span>
                                  </div>
-                                 <div style={{ background: item.trendMonth > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendMonth < 0 ? 'rgba(255, 69, 58, 0.15)' : 'var(--bg-secondary)'), color: item.trendMonth > 0 ? 'var(--accent-green)' : (item.trendMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900' }}>{item.trendMonth > 0 ? '+' : ''}{(item.trendMonth || 0).toFixed(1)}%</div>
+                                 <div className="flex flex-col items-end">
+                                    <div style={{ background: item.trendMonth > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendMonth < 0 ? 'rgba(255, 69, 58, 0.15)' : 'var(--bg-secondary)'), color: item.trendMonth > 0 ? 'var(--accent-green)' : (item.trendMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900', marginBottom: '4px' }}>{item.trendMonth > 0 ? '+' : ''}{(item.trendMonth || 0).toFixed(1)}%</div>
+                                    <span style={{ fontSize: '14px', fontWeight: '900', color: item.diffMonth > 0 ? 'var(--accent-green)' : (item.diffMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), marginRight: '-6px' }}>{item.diffMonth > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffMonth || 0)) : formatNum(Math.round(item.diffMonth || 0))}</span>
+                                 </div>
                               </div>
                            )}
 
                            {/* Previous Year */}
                            {!hasActiveFilters && (
-                              <div className="flex justify-between items-center px-2">
-                                 <div className="flex flex-col"><span className="text-secondary text-[13px] font-semibold mb-1">Նախորդ Տարի (տվյալ ամիս)</span>
+                              <div className="flex justify-between items-end px-2 mt-4">
+                                 <div className="flex flex-col"><span className="text-secondary text-[11px] font-semibold mb-1">Նախորդ Տարի (տվյալ ամիս)</span>
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-x-1 text-secondary text-[12px] mb-1">
                                        <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.prevYear)}</span></span>
                                        <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgY || 0))}</span></span>
                                     </div>
-                                    <span style={{ fontSize: '16px', fontWeight: '900', color: item.diffYear > 0 ? 'var(--accent-green)' : (item.diffYear < 0 ? 'var(--accent-orange)' : 'var(--text-secondary)') }}>{item.diffYear > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffYear || 0)) : formatNum(Math.round(item.diffYear || 0))}</span>
                                  </div>
-                                 <div style={{ background: item.trendYear > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendYear < 0 ? 'rgba(255, 159, 10, 0.15)' : 'var(--bg-secondary)'), color: item.trendYear > 0 ? 'var(--accent-green)' : (item.trendYear < 0 ? 'var(--accent-orange)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900' }}>{item.trendYear > 0 ? '+' : ''}{(item.trendYear || 0).toFixed(1)}%</div>
+                                 <div className="flex flex-col items-end">
+                                    <div style={{ background: item.trendYear > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendYear < 0 ? 'rgba(255, 159, 10, 0.15)' : 'var(--bg-secondary)'), color: item.trendYear > 0 ? 'var(--accent-green)' : (item.trendYear < 0 ? 'var(--accent-orange)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900', marginBottom: '4px' }}>{item.trendYear > 0 ? '+' : ''}{(item.trendYear || 0).toFixed(1)}%</div>
+                                    <span style={{ fontSize: '14px', fontWeight: '900', color: item.diffYear > 0 ? 'var(--accent-green)' : (item.diffYear < 0 ? 'var(--accent-orange)' : 'var(--text-secondary)'), marginRight: '-6px' }}>{item.diffYear > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffYear || 0)) : formatNum(Math.round(item.diffYear || 0))}</span>
+                                 </div>
                               </div>
                            )}
                         </div></div>

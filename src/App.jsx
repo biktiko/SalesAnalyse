@@ -59,11 +59,12 @@ const MobileNav = () => {
        <div className="flex items-center">
           <span className="font-bold tracking-tight text-xl text-primary">Martin Star</span>
        </div>
-       
-       <button className="btn-icon bg-transparent p-0 m-0" style={{ width: 32, height: 32 }} onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <X size={26} /> : <Menu size={26} />}
-       </button>
-
+       <div className="flex items-center justify-end flex-1 gap-2">
+           <div id="mobile-header-actions"></div>
+           <button className="btn-icon bg-transparent p-0 m-0" style={{ width: 32, height: 32 }} onClick={() => setIsOpen(!isOpen)}>
+              {isOpen ? <X size={26} /> : <Menu size={26} />}
+           </button>
+       </div>
        {/* Mobile Menu Overlay */}
        <div className={`mobile-menu-items shadow-2xl ${isOpen ? 'open' : ''}`}>
           <NavLink 
