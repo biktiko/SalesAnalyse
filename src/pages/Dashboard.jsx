@@ -68,7 +68,7 @@ const Dashboard = () => {
   
   // Navigation State
   const [viewMode, setViewMode] = useState('all'); // 'all', 'growth', 'decline'
-  const [timeFrame, setTimeFrame] = useState('month'); // 'month', 'year'
+  const [activeModes, setActiveModes] = useState({ month: true, year: true, avg: true });
   const [search, setSearch] = useState('');
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
 
@@ -325,7 +325,7 @@ const Dashboard = () => {
     const isComparison = (viewMode !== 'all') || (filters.periodBStart && filters.periodBEnd);
 
     if (isComparison) {
-      const frame = (viewMode === 'all') ? 'month' : timeFrame;
+      const frame = activeModes.year && !activeModes.month ? 'year' : 'month';
       
       if (viewMode === 'decline') {
         result = result
@@ -363,7 +363,7 @@ const Dashboard = () => {
       result = result.filter(i => i.name && i.name.toLowerCase().includes(lowerReq));
     }
     return result;
-  }, [data, viewMode, timeFrame, search, sortOrder, filters]);
+  }, [data, viewMode, activeModes, search, sortOrder, filters]);
 
   const downloadExcel = () => {
     const titleA = (hasActiveFilters && filters.periodAStart && filters.periodAEnd) 
@@ -529,13 +529,15 @@ const Dashboard = () => {
       };
     } 
     else if (viewMode === 'decline') {
-      const diffKey = timeFrame === 'month' ? 'diffMonth' : 'diffYear';
-      const totalLost = filteredData.reduce((acc, curr) => acc + curr[diffKey], 0);
+      const frame = activeModes.year && !activeModes.month ? 'year' : 'month';
+      const diffKey = frame === 'month' ? 'diffMonth' : 'diffYear';
+      const totalLost = filteredData.reduce((acc, curr) => acc + curr[diffKey] || 0, 0);
       return { title: "Անկումային Պրոդուկտներ", mainNumber: count, subtext: `Ընդհանուր ծավալային անկում՝ ${formatNum(totalLost)} `, isDecline: true };
     }
     else {
-      const diffKey = timeFrame === 'month' ? 'diffMonth' : 'diffYear';
-      const totalGained = filteredData.reduce((acc, curr) => acc + curr[diffKey], 0);
+      const frame = activeModes.year && !activeModes.month ? 'year' : 'month';
+      const diffKey = frame === 'month' ? 'diffMonth' : 'diffYear';
+      const totalGained = filteredData.reduce((acc, curr) => acc + curr[diffKey] || 0, 0);
       return { title: "Աճող Պրոդուկտներ", mainNumber: count, subtext: `Ընդհանուր ծավալային աճ՝ +${formatNum(totalGained)}`, isGrowth: true };
     }
   };
@@ -578,21 +580,73 @@ const Dashboard = () => {
                ))}
             </div>
 
-            <AnimatePresence>
-               {viewMode !== 'all' && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
-                     <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', padding: '6px', background: 'var(--bg-secondary)', width: 'fit-content', borderRadius: '12px' }}>
-                        <button onClick={() => setTimeFrame('month')} style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', background: timeFrame === 'month' ? 'var(--bg-primary)' : 'transparent', color: timeFrame === 'month' ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: timeFrame === 'month' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}>Ընթացիկ Ամիս</button>
-                        <button onClick={() => setTimeFrame('year')} style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', background: timeFrame === 'year' ? 'var(--bg-primary)' : 'transparent', color: timeFrame === 'year' ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: timeFrame === 'year' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}>Նախորդ Տարի</button>
-                     </div>
-                  </motion.div>
-               )}
-            </AnimatePresence>
+          <AnimatePresence>
+             {!hasActiveFilters && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
+                   <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', padding: '6px', background: 'var(--bg-secondary)', width: 'fit-content', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+                      <button 
+                        onClick={() => {
+                          setActiveModes(prev => ({ ...prev, month: !prev.month }));
+                        }}
+                        style={{ 
+                          padding: isMobile ? '8px 12px' : '8px 20px', 
+                          borderRadius: '10px', 
+                          fontSize: '13px', 
+                          fontWeight: 'bold', 
+                          background: activeModes.month ? 'var(--bg-primary)' : 'transparent', 
+                          color: activeModes.month ? 'var(--text-primary)' : 'var(--text-secondary)', 
+                          boxShadow: activeModes.month ? '0 4px 12px rgba(0,0,0,0.08)' : 'none',
+                          border: activeModes.month ? '1px solid var(--border-color)' : '1px solid transparent',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Նախորդ Ամիս
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setActiveModes(prev => ({ ...prev, year: !prev.year }));
+                        }}
+                        style={{ 
+                          padding: isMobile ? '8px 12px' : '8px 20px', 
+                          borderRadius: '10px', 
+                          fontSize: '13px', 
+                          fontWeight: 'bold', 
+                          background: activeModes.year ? 'var(--bg-primary)' : 'transparent', 
+                          color: activeModes.year ? 'var(--text-primary)' : 'var(--text-secondary)', 
+                          boxShadow: activeModes.year ? '0 4px 12px rgba(0,0,0,0.08)' : 'none',
+                          border: activeModes.year ? '1px solid var(--border-color)' : '1px solid transparent',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Նախորդ Տարի
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setActiveModes(prev => ({ ...prev, avg: !prev.avg }));
+                        }}
+                        style={{ 
+                          padding: isMobile ? '8px 12px' : '8px 20px', 
+                          borderRadius: '10px', 
+                          fontSize: '13px', 
+                          fontWeight: 'bold', 
+                          background: activeModes.avg ? 'var(--bg-primary)' : 'transparent', 
+                          color: activeModes.avg ? 'var(--text-primary)' : 'var(--text-secondary)', 
+                          boxShadow: activeModes.avg ? '0 4px 12px rgba(0,0,0,0.08)' : 'none',
+                          border: activeModes.avg ? '1px solid var(--border-color)' : '1px solid transparent',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Միջինում օրական
+                      </button>
+                   </div>
+                </motion.div>
+             )}
+          </AnimatePresence>
 
          <AnimatePresence>
             {isFilterModalOpen && (
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '8px' : '16px' }} onClick={() => setIsFilterModalOpen(false)}>
-                  <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-primary)', width: '100%', maxWidth: '440px', borderRadius: isMobile ? '24px' : '28px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', maxHeight: isMobile ? '92vh' : '90vh' }}>
+               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', zIndex: 200, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? '0' : '16px' }} onClick={() => setIsFilterModalOpen(false)}>
+                  <motion.div initial={{ scale: isMobile ? 1 : 0.95, y: isMobile ? 80 : 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: isMobile ? 1 : 0.95, y: isMobile ? 80 : 20 }} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-primary)', width: '100%', maxWidth: isMobile ? '100%' : '440px', borderRadius: isMobile ? '24px 24px 0 0' : '28px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 -10px 50px rgba(0,0,0,0.2)', maxHeight: isMobile ? '88vh' : '90vh' }}>
                      <div style={{ padding: isMobile ? '16px 20px 12px' : '20px 28px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)' }}>
                         <h2 className="title-font" style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '900', color: 'var(--text-primary)' }}>Ֆիլտրներ</h2>
                         <button onClick={() => setIsFilterModalOpen(false)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: isMobile ? '28px' : '32px', height: isMobile ? '28px' : '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} strokeWidth={2.5} /></button>
@@ -683,8 +737,8 @@ const Dashboard = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                {loading && data.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary"><p>Բեռնվում են տվյալները...</p></div>) : filteredData.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary glass-card" style={{ borderRadius: '24px' }}><CheckCircle2 size={40} className="mb-4 text-green" /><p className="font-bold text-lg">Տվյալներ չեն գտնվել / Դատարկ է</p></div>) : (
                   filteredData.map((item) => (
-                     <div key={item.id} onClick={() => fetchProductGraph(item, chartRange)} className="glass-card hover-lift cursor-pointer" style={{ padding: '24px', borderRadius: '24px', display: 'flex', flexDirection: 'column', flex: '1 1 calc(50% - 16px)', minWidth: '320px', maxWidth: '100%' }}><h3 style={{ fontSize: '16px', fontWeight: 'bold', lineHeight: '1.4', color: 'var(--text-primary)', marginBottom: '24px' }}>{item.name}</h3>
-                        <div className="flex flex-col gap-6">
+                     <div key={item.id} onClick={() => fetchProductGraph(item, chartRange)} className="glass-card hover-lift cursor-pointer" style={{ padding: activeModes.avg ? '24px' : '16px 20px', borderRadius: '24px', display: 'flex', flexDirection: 'column', flex: '1 1 calc(50% - 16px)', minWidth: '320px', maxWidth: '100%' }}><h3 style={{ fontSize: '16px', fontWeight: 'bold', lineHeight: '1.4', color: 'var(--text-primary)', marginBottom: activeModes.avg ? '24px' : '12px' }}>{item.name}</h3>
+                        <div className={`flex flex-col ${activeModes.avg ? 'gap-6' : 'gap-2'}`}>
                            <div className="flex justify-between items-center bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-color)]">
                               <div className="flex flex-col">
                                  <span className="text-secondary text-[13px] font-semibold mb-1">
@@ -692,21 +746,21 @@ const Dashboard = () => {
                                  </span>
                                  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-x-1 text-secondary text-[12px]">
                                     <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.current)}</span></span>
-                                    <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgA || 0))}</span></span>
+                                    {activeModes.avg && <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgA || 0))}</span></span>}
                                  </div>
                               </div>
                            </div>
 
                            {/* Previous Period */}
-                           {(!hasActiveFilters || (hasActiveFilters && filters.periodBStart && filters.periodBEnd)) && (
-                              <div className="flex justify-between items-end px-2 mt-2">
+                           {((!hasActiveFilters && activeModes.month) || (hasActiveFilters && filters.periodBStart && filters.periodBEnd)) && (
+                              <div className={`flex justify-between items-end px-2 ${activeModes.avg ? 'mt-2' : 'mt-1'}`}>
                                  <div className="flex flex-col">
                                     <span className="text-secondary text-[13px] font-semibold mb-1">
                                        {(hasActiveFilters && filters.periodBStart && filters.periodBEnd) ? formatDateRange(filters.periodBStart, filters.periodBEnd) : 'Նախորդ Ամիս'}
                                     </span>
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-x-1 text-secondary text-[12px] mb-1">
                                        <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.previous)}</span></span>
-                                       <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgB || 0))}</span></span>
+                                       {activeModes.avg && <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgB || 0))}</span></span>}
                                     </div>
                                  </div>
                                  <div className="flex flex-col items-end">
@@ -717,12 +771,12 @@ const Dashboard = () => {
                            )}
 
                            {/* Previous Year */}
-                           {!hasActiveFilters && (
-                              <div className="flex justify-between items-end px-2 mt-4">
-                                 <div className="flex flex-col"><span className="text-secondary text-[11px] font-semibold mb-1">Նախորդ Տարի (տվյալ ամիս)</span>
+                           {!hasActiveFilters && activeModes.year && (
+                              <div className={`flex justify-between items-end px-2 ${activeModes.avg ? 'mt-4' : 'mt-1'}`}>
+                                 <div className="flex flex-col"><span className="text-secondary text-[11px] font-semibold mb-1">Նախորդ Տարի</span>
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-x-1 text-secondary text-[12px] mb-1">
                                        <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.prevYear)}</span></span>
-                                       <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgY || 0))}</span></span>
+                                       {activeModes.avg && <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgY || 0))}</span></span>}
                                     </div>
                                  </div>
                                  <div className="flex flex-col items-end">
