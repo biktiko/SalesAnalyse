@@ -651,7 +651,7 @@ const Dashboard = () => {
                         <h2 className="title-font" style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '900', color: 'var(--text-primary)' }}>Ֆիլտրներ</h2>
                         <button onClick={() => setIsFilterModalOpen(false)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: isMobile ? '28px' : '32px', height: isMobile ? '28px' : '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} strokeWidth={2.5} /></button>
                      </div>
-                     <div style={{ padding: isMobile ? '12px 16px' : '20px 28px', display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '20px', flex: 1, overflowY: 'auto' }}>
+                     <div style={{ padding: isMobile ? '12px 16px' : '20px 28px', display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '20px', flex: '1 1 auto', overflowY: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
                         <div>
                            <label style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: isMobile ? '8px' : '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} className="text-blue" />Ժամանակահատված 1 <span style={{ color: 'var(--accent-red)' }}>*</span></label>
                            <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center">

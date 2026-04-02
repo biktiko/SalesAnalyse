@@ -97,7 +97,7 @@ const MobileNav = () => {
             onClick={() => setIsOpen(false)}
           >
             <Database size={20} />
-            <span className="font-bold">Develop Test DB</span>
+            <span className="font-bold">SQL</span>
           </NavLink>
           <NavLink 
             to="/settings" 
