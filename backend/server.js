@@ -9,6 +9,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Root endpoint for simple Health Checks (Cron-job.org/Render.com)
+app.get('/', (req, res) => res.send('OK'));
+
 const SSH_CONFIG = {
   host: process.env.SSH_HOST || '51.158.61.4',
   port: 22,
