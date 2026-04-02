@@ -121,6 +121,20 @@ const Dashboard = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    if (isFilterModalOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, [isFilterModalOpen]);
+
   const [modalData, setModalData] = useState([]);
   const [chartRange, setChartRange] = useState('30days'); // 30days, 90days, 180days, 1year
   const [chartGroup, setChartGroup] = useState('day'); // day, week, month
@@ -645,13 +659,13 @@ const Dashboard = () => {
 
          <AnimatePresence>
             {isFilterModalOpen && (
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', zIndex: 200, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? '0' : '16px' }} onClick={() => setIsFilterModalOpen(false)}>
-                  <motion.div initial={{ scale: isMobile ? 1 : 0.95, y: isMobile ? 80 : 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: isMobile ? 1 : 0.95, y: isMobile ? 80 : 20 }} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-primary)', width: '100%', maxWidth: isMobile ? '100%' : '440px', borderRadius: isMobile ? '24px 24px 0 0' : '28px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 -10px 50px rgba(0,0,0,0.2)', maxHeight: isMobile ? '88vh' : '90vh' }}>
+               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? '0' : '16px', touchAction: 'none' }} onClick={() => setIsFilterModalOpen(false)}>
+                  <motion.div initial={{ scale: isMobile ? 1 : 0.95, y: isMobile ? 80 : 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: isMobile ? 1 : 0.95, y: isMobile ? 80 : 20 }} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-primary)', width: '100%', maxWidth: isMobile ? '100%' : '440px', borderRadius: isMobile ? '24px 24px 0 0' : '28px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 -10px 50px rgba(0,0,0,0.2)', maxHeight: isMobile ? '88vh' : '90vh', touchAction: 'auto' }}>
                      <div style={{ padding: isMobile ? '16px 20px 12px' : '20px 28px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)' }}>
                         <h2 className="title-font" style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '900', color: 'var(--text-primary)' }}>Ֆիլտրներ</h2>
                         <button onClick={() => setIsFilterModalOpen(false)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: isMobile ? '28px' : '32px', height: isMobile ? '28px' : '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} strokeWidth={2.5} /></button>
                      </div>
-                     <div style={{ padding: isMobile ? '12px 16px' : '20px 28px', display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '20px', flex: '1 1 auto', overflowY: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
+                     <div style={{ padding: isMobile ? '12px 16px' : '20px 28px', display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '20px', flex: '1 1 auto', overflowY: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0, touchAction: 'pan-y' }}>
                         <div>
                            <label style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: isMobile ? '8px' : '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={18} className="text-blue" />Ժամանակահատված 1 <span style={{ color: 'var(--accent-red)' }}>*</span></label>
                            <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center">
