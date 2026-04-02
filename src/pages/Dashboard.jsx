@@ -521,12 +521,12 @@ const Dashboard = () => {
     else if (viewMode === 'decline') {
       const diffKey = timeFrame === 'month' ? 'diffMonth' : 'diffYear';
       const totalLost = filteredData.reduce((acc, curr) => acc + curr[diffKey], 0);
-      return { title: "Անկումային Պրոդուկտներ", mainNumber: count, subtext: `Ընդհանուր ծավալային անկում՝ ${formatNum(totalLost)} հատ`, isDecline: true };
+      return { title: "Անկումային Պրոդուկտներ", mainNumber: count, subtext: `Ընդհանուր ծավալային անկում՝ ${formatNum(totalLost)} `, isDecline: true };
     }
     else {
       const diffKey = timeFrame === 'month' ? 'diffMonth' : 'diffYear';
       const totalGained = filteredData.reduce((acc, curr) => acc + curr[diffKey], 0);
-      return { title: "Աճող Պրոդուկտներ", mainNumber: count, subtext: `Ընդհանուր ծավալային աճ՝ +${formatNum(totalGained)} հատ`, isGrowth: true };
+      return { title: "Աճող Պրոդուկտներ", mainNumber: count, subtext: `Ընդհանուր ծավալային աճ՝ +${formatNum(totalGained)}`, isGrowth: true };
     }
   };
 
@@ -631,10 +631,10 @@ const Dashboard = () => {
 
             <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card mb-6" style={{ padding: '24px', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
                <div className="flex flex-col gap-6">
-                  <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '50px', marginBottom: '8px' }}>
-                     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block">{kpi.title}</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{formatNum(kpi.mainNumber)}</span><span className="text-[13px] md:text-[14px] text-secondary font-medium uppercase">Հատ</span></div></div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '30px', marginBottom: '8px' }}>
+                     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block leading-snug max-w-[120px] md:max-w-none md:whitespace-nowrap">{kpi.title}</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{formatNum(kpi.mainNumber)}</span><span className="text-[13px] md:text-[14px] text-secondary font-medium uppercase">Հատ</span></div></div>
                      {viewMode === 'all' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', paddingLeft: '30px', borderLeft: '1px solid var(--border-color)', flexShrink: 0, minWidth: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block leading-snug">Պրոդուկտների <br className="md:hidden" /> Քանակ</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{kpi.subtext.replace('Դիտարկվում է ', '').replace(' պրոդուկտ', '')}</span><span className="text-[12px] md:text-[13px] text-secondary font-medium uppercase tracking-wider">Տեսակ</span></div></div>
+                        <div className="pl-0 md:pl-[30px] border-l-0 md:border-l" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', borderColor: 'var(--border-color)', flexShrink: 0, minWidth: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block leading-snug max-w-[120px] md:max-w-none md:whitespace-nowrap">Պրոդուկտների Քանակ</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{kpi.subtext.replace('Դիտարկվում է ', '').replace(' պրոդուկտ', '')}</span><span className="text-[12px] md:text-[13px] text-secondary font-medium uppercase tracking-wider">Տեսակ</span></div></div>
                      )}
                   </div>
                   {viewMode === 'all' && kpi.stats && (
@@ -687,10 +687,10 @@ const Dashboard = () => {
                                        {(hasActiveFilters && filters.periodBStart && filters.periodBEnd) ? formatDateRange(filters.periodBStart, filters.periodBEnd) : 'Նախորդ Ամիս'}
                                     </span>
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-x-1 text-secondary text-[12px] mb-1">
-                                       <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.previous)}</span> հատ</span>
-                                       <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgB || 0))}</span> հատ</span>
+                                       <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.previous)}</span></span>
+                                       <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgB || 0))}</span></span>
                                     </div>
-                                    <span style={{ fontSize: '16px', fontWeight: '900', color: item.diffMonth > 0 ? 'var(--accent-green)' : (item.diffMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)') }}>{item.diffMonth > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffMonth || 0)) : formatNum(Math.round(item.diffMonth || 0))} հատ</span>
+                                    <span style={{ fontSize: '16px', fontWeight: '900', color: item.diffMonth > 0 ? 'var(--accent-green)' : (item.diffMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)') }}>{item.diffMonth > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffMonth || 0)) : formatNum(Math.round(item.diffMonth || 0))}</span>
                                  </div>
                                  <div style={{ background: item.trendMonth > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendMonth < 0 ? 'rgba(255, 69, 58, 0.15)' : 'var(--bg-secondary)'), color: item.trendMonth > 0 ? 'var(--accent-green)' : (item.trendMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900' }}>{item.trendMonth > 0 ? '+' : ''}{(item.trendMonth || 0).toFixed(1)}%</div>
                               </div>
@@ -699,12 +699,12 @@ const Dashboard = () => {
                            {/* Previous Year */}
                            {!hasActiveFilters && (
                               <div className="flex justify-between items-center px-2">
-                                 <div className="flex flex-col"><span className="text-secondary text-[13px] font-semibold mb-1">Նախորդ Տարի</span>
+                                 <div className="flex flex-col"><span className="text-secondary text-[13px] font-semibold mb-1">Նախորդ Տարի (տվյալ ամիս)</span>
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-x-1 text-secondary text-[12px] mb-1">
-                                       <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.prevYear)}</span> հատ</span>
-                                       <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgY || 0))}</span> հատ</span>
+                                       <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.prevYear)}</span></span>
+                                       <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgY || 0))}</span></span>
                                     </div>
-                                    <span style={{ fontSize: '16px', fontWeight: '900', color: item.diffYear > 0 ? 'var(--accent-green)' : (item.diffYear < 0 ? 'var(--accent-orange)' : 'var(--text-secondary)') }}>{item.diffYear > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffYear || 0)) : formatNum(Math.round(item.diffYear || 0))} հատ</span>
+                                    <span style={{ fontSize: '16px', fontWeight: '900', color: item.diffYear > 0 ? 'var(--accent-green)' : (item.diffYear < 0 ? 'var(--accent-orange)' : 'var(--text-secondary)') }}>{item.diffYear > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffYear || 0)) : formatNum(Math.round(item.diffYear || 0))}</span>
                                  </div>
                                  <div style={{ background: item.trendYear > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendYear < 0 ? 'rgba(255, 159, 10, 0.15)' : 'var(--bg-secondary)'), color: item.trendYear > 0 ? 'var(--accent-green)' : (item.trendYear < 0 ? 'var(--accent-orange)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900' }}>{item.trendYear > 0 ? '+' : ''}{(item.trendYear || 0).toFixed(1)}%</div>
                               </div>
@@ -726,7 +726,7 @@ const Dashboard = () => {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={16} className="text-secondary" /><select value={chartRange} onChange={(e) => { setChartRange(e.target.value); fetchProductGraph(selectedProduct, e.target.value); }} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}><option value="30days">Վերջին 30 օր</option><option value="90days">Վերջին 90 օր</option><option value="180days">Վերջին 180 օր</option><option value="1year">Վերջին 1 տարի</option></select></div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Filter size={16} className="text-secondary" /><select value={chartGroup} onChange={(e) => setChartGroup(e.target.value)} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}><option value="day">Ըստ օրերի</option><option value="week">Ըստ շաբաթների</option><option value="month">Ըստ ամիսների</option></select></div>
                        </div>
-                       {!modalLoading && chartProcessedData.length > 0 && (<div style={{ background: 'var(--bg-primary)', padding: '6px 16px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', fontWeight: 'bold', fontSize: '14px' }}>Ընդհանուր՝ <span className="text-blue">{formatNum(summaryTotal)}</span> հատ.</div>)}
+                       {!modalLoading && chartProcessedData.length > 0 && (<div style={{ background: 'var(--bg-primary)', padding: '6px 16px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', fontWeight: 'bold', fontSize: '14px' }}>Ընդհանուր՝ <span className="text-blue">{formatNum(summaryTotal)}</span></div>)}
                     </div>
                     <div style={{ padding: '24px', flex: 1, minHeight: '350px' }}>
                        {modalLoading ? (<div className="flex flex-col items-center justify-center h-full text-secondary"><Loader2 size={32} className="animate-spin mb-4 text-blue" /><p>Ստացվում են վաճառքի պատմության տվյալները...</p></div>) : chartProcessedData.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-secondary"><AlertTriangle size={36} className="mb-4 text-orange-500" /><p className="font-bold text-lg">Այս ժամանակահատվածում վաճառքներ չկան</p></div>) : (
