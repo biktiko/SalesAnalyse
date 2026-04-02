@@ -12,9 +12,14 @@ const Promotions = () => {
   const [newPromo, setNewPromo] = useState({ id: '', name: '', description: '', products: [] });
 
   useEffect(() => {
-    setPromotions(getPromotions());
+    loadPromotions();
     fetchProducts();
   }, []);
+
+  const loadPromotions = async () => {
+    const data = await getPromotions();
+    setPromotions(data);
+  };
 
   const fetchProducts = async () => {
     const cached = sessionStorage.getItem('promo_products_list');
@@ -25,7 +30,7 @@ const Promotions = () => {
     }
     
     try {
-      const api_url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const api_url = import.meta.env.VITE_API_URL;
       const res = await fetch(`${api_url}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -44,27 +49,30 @@ const Promotions = () => {
     }
   };
 
-  const handleSavePromo = () => {
+  const handleSavePromo = async () => {
     if (!newPromo.name.trim()) return alert('Գրեք ակցիայի անվանումը');
     if (newPromo.products.length === 0) return alert('Ավելացրեք գոնե մեկ պրոդուկտ');
     
     let updated;
+    const promoId = newPromo.id || Date.now().toString();
+    const updatedPromo = { ...newPromo, id: promoId };
+
     if (newPromo.id) {
-       updated = promotions.map(p => p.id === newPromo.id ? newPromo : p);
+       updated = promotions.map(p => p.id === newPromo.id ? updatedPromo : p);
     } else {
-       updated = [...promotions, { ...newPromo, id: Date.now().toString() }];
+       updated = [...promotions, updatedPromo];
     }
     
     setPromotions(updated);
-    savePromotions(updated);
+    await savePromotions(updated);
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm("Համոզվա՞ծ եք։")) return;
     const updated = promotions.filter(p => p.id !== id);
     setPromotions(updated);
-    savePromotions(updated);
+    await savePromotions(updated);
   };
 
   const openNewModal = () => {

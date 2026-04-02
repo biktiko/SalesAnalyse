@@ -197,7 +197,7 @@ const Dashboard = () => {
       }
 
       // --- Promotions Unpacking Logic ---
-      const activePromos = getPromotions();
+      const activePromos = await getPromotions();
       const productMap = new Map();
 
       resData.rows.forEach(r => {
@@ -423,7 +423,7 @@ const Dashboard = () => {
     if (range === '180days') intervalStr = '180 days';
     if (range === '1year') intervalStr = '1 year';
 
-    const activePromos = getPromotions();
+    const activePromos = await getPromotions();
     const relevantPromos = activePromos.filter(p => p.products.some(prod => String(prod.productId) === String(product.id)));
     const promoNamesSql = relevantPromos.map(p => `'${p.name.replace(/'/g, "''")}'`).join(', ');
     const whereClause = `(product_id = ${product.id} ${promoNamesSql ? `OR product_name IN (${promoNamesSql})` : ''})`;
