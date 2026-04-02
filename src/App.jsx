@@ -116,6 +116,32 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
 
+  // Keep-alive for Render.com backend
+  React.useEffect(() => {
+    const api_url = import.meta.env.VITE_API_URL;
+    if (!api_url) return;
+
+    const pingServer = async () => {
+      try {
+        // Simple dummy query to keep SSH and DB connection warm
+        await fetch(`${api_url}/query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ queryText: 'SELECT 1' })
+        });
+        console.log('Backend pinged successfully to stay awake');
+      } catch (e) {
+        console.warn('Backend ping failed', e);
+      }
+    };
+
+    // Ping every 30 seconds as requested ("constantly")
+    const interval = setInterval(pingServer, 30000);
+    pingServer(); // Immediate first ping
+
+    return () => clearInterval(interval);
+  }, []);
+
   if (!isAuthenticated) {
     return <Login onLogin={(userObj) => { setUser(userObj); setIsAuthenticated(true); }} />;
   }
