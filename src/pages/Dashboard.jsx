@@ -513,8 +513,8 @@ const Dashboard = () => {
         mainNumber: totalCurrent,
         subtext: "Դիտարկվում է " + formatNum(count) + " պրոդուկտ",
         stats: [
-          { label: "Նախ. ամսվա համեմատ " + formatNum(totalPrevMonth) + " հատ", trend: trendMonth },
-          { label: "Նախ. տարվա համեմատ " + formatNum(totalPrevYear) + " հատ", trend: trendYear }
+          { label: "Նախ. ամսվա համեմատ " + formatNum(totalPrevMonth), trend: trendMonth },
+          { label: "Նախ. տարվա համեմատ " + formatNum(totalPrevYear), trend: trendYear }
         ]
       };
     } 
@@ -673,8 +673,8 @@ const Dashboard = () => {
                                     {(hasActiveFilters && filters.periodAStart && filters.periodAEnd) ? formatDateRange(filters.periodAStart, filters.periodAEnd) : 'Վերջին 30 օրը'}
                                  </span>
                                  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-x-1 text-secondary text-[12px]">
-                                    <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.current)}</span> հատ</span>
-                                    <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgA || 0))}</span> հատ</span>
+                                    <span className="whitespace-nowrap">Ընդհանուր: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(item.current)}</span></span>
+                                    <span className="whitespace-nowrap">Միջինում օրական: <span style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>{formatNum(Math.round(item.avgA || 0))}</span></span>
                                  </div>
                               </div>
                            </div>
