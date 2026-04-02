@@ -320,3 +320,78 @@ body.dark-mode .login-card {
 }
 
 ::-webkit-scrollbar { display: none; }
+
+/* Date Range Picker Premium Styling */
+.range-picker-container {
+  background: var(--bg-secondary);
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.rdrCalendarWrapper {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+  font-family: inherit !important;
+  width: 100%;
+}
+
+.rdrMonth {
+  width: 100% !important;
+  padding: 0 0.5em 1em 0.5em !important;
+}
+
+.rdrDateDisplayWrapper {
+  background-color: transparent !important;
+}
+
+.rdrDateInput {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.rdrDayNumber span {
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
+}
+
+.rdrDayPassive .rdrDayNumber span {
+  color: var(--text-secondary) !important;
+  opacity: 0.4;
+}
+
+.rdrDayToday .rdrDayNumber span:after {
+  background: var(--accent-blue) !important;
+}
+
+.rdrSelected, .rdrInRange, .rdrStartEdge, .rdrEndEdge {
+  top: 4px !important;
+  bottom: 4px !important;
+}
+
+.rdrDayInPreview {
+  border: none !important;
+}
+
+body.dark-mode .rdrCalendarWrapper {
+  background: #000 !important;
+}
+
+body.dark-mode .rdrDayDisabled {
+  background-color: #1a1a1a !important;
+}
+
+body.dark-mode .rdrMonthAndYearPickers select {
+  color: #fff !important;
+}
+
+@media (max-width: 480px) {
+  .rdrCalendarWrapper {
+    font-size: 12px !important;
+  }
+}
