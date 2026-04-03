@@ -72,7 +72,7 @@ const Dashboard = () => {
   
   // Navigation State
   const [viewMode, setViewMode] = useState('all'); // 'all', 'growth', 'decline'
-  const [activeModes, setActiveModes] = useState({ month: true, year: true, avg: true });
+  const [activeModes, setActiveModes] = useState({ month: true, year: true, avg: false });
   const [search, setSearch] = useState('');
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
 
