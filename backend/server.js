@@ -17,7 +17,7 @@ const SSH_CONFIG = {
   port: 22,
   username: process.env.SSH_USER,
   password: process.env.SSH_PASS,
-  readyTimeout: 15000 // Increase timeout for slow Render connections
+  readyTimeout: 20000 
 };
 
 const DB_CONFIG = {
@@ -30,31 +30,26 @@ const DB_CONFIG = {
 
 app.post('/api/query', async (req, res) => {
   const { queryText } = req.body;
-  
-  if (!queryText) {
-    return res.status(400).json({ error: 'Missing queryText' });
-  }
+  if (!queryText) return res.status(400).json({ error: 'Missing queryText' });
 
   const ssh = new SSHClient();
   let server = null;
-  // Use a predictable local port for the tunnel to avoid Render port blocking
-  const tunnelPort = 5433; 
+  const tunnelPort = 5433;
 
   const cleanup = () => {
-    if (server) {
-      server.close(() => console.log('Tunnel server closed.'));
-      server = null;
-    }
-    ssh.end();
+    try {
+      if (server) {
+        server.close();
+        server = null;
+      }
+      ssh.end();
+    } catch (e) {}
   };
 
   ssh.on('ready', () => {
-    console.log('SSH Tunnel: Connection Established');
-    
     server = net.createServer((socket) => {
       ssh.forwardOut('127.0.0.1', socket.remotePort, DB_CONFIG.host, DB_CONFIG.port, (err, stream) => {
         if (err) {
-          console.error('Forward Error:', err.message);
           socket.end();
           return;
         }
@@ -70,7 +65,7 @@ app.post('/api/query', async (req, res) => {
         user: DB_CONFIG.user,
         password: DB_CONFIG.password,
         database: DB_CONFIG.database,
-        connectionTimeoutMillis: 5000
+        connectionTimeoutMillis: 10000
       });
 
       pgClient.on('error', (err) => {
@@ -92,7 +87,6 @@ app.post('/api/query', async (req, res) => {
         await pgClient.end();
         cleanup();
       } catch (dbErr) {
-        console.error('Database Operation Failed:', dbErr.message);
         cleanup();
         if (!res.headersSent) {
           res.status(500).json({ 
@@ -105,7 +99,6 @@ app.post('/api/query', async (req, res) => {
     });
 
     server.on('error', (err) => {
-      console.error('Tunnel Server Failed:', err.message);
       cleanup();
       if (!res.headersSent) {
         res.status(500).json({ error: 'TUNNEL_ERROR', message: err.message });
@@ -113,7 +106,6 @@ app.post('/api/query', async (req, res) => {
     });
 
   }).on('error', (err) => {
-    console.error('SSH Authentication Failed:', err.message);
     cleanup();
     if (!res.headersSent) {
       res.status(500).json({ 
@@ -127,5 +119,8 @@ app.post('/api/query', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server listening on 0.0.0.0:${PORT}`);
+  console.log(`API Server live on port ${PORT}`);
 });
+
+// Explicit keep-alive for Windows environment
+setInterval(() => {}, 100000);
