@@ -550,11 +550,29 @@ const Dashboard = () => {
   const getDynamicKPI = () => {
     const totalCurrent = filteredData.reduce((acc, curr) => acc + curr.current, 0);
     const count = filteredData.length;
+    
     if (viewMode === 'all') {
+      const isComparison = hasActiveFilters && filters.periodAStart && filters.periodBStart;
       const totalPrevMonth = filteredData.reduce((acc, curr) => acc + curr.previous, 0);
       const totalPrevYear = filteredData.reduce((acc, curr) => acc + curr.prevYear, 0);
+      
       const trendMonth = totalPrevMonth > 0 ? ((totalCurrent - totalPrevMonth) / totalPrevMonth) * 100 : 0;
       const trendYear = totalPrevYear > 0 ? ((totalCurrent - totalPrevYear) / totalPrevYear) * 100 : 0;
+      
+      if (isComparison) {
+        const diff = totalCurrent - totalPrevMonth;
+        const trend = totalPrevMonth > 0 ? (diff / totalPrevMonth) * 100 : 0;
+        return { 
+          isComparison: true,
+          title: "Համեմատական վերլուծություն",
+          mainNumber: totalCurrent,
+          compareNumber: totalPrevMonth,
+          trend: trend,
+          diff: diff,
+          subtext: "Դիտարկվում է " + formatNum(count) + " պրոդուկտ",
+        };
+      }
+
       return { 
         title: "Ընդհանուր Վաճառք",
         mainNumber: totalCurrent,
@@ -611,23 +629,100 @@ const Dashboard = () => {
           </div>
         ) : (
           <>
-            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card mb-4" style={{ padding: '24px', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
-               <div className="flex flex-col gap-6">
-                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '30px', marginBottom: '8px' }}>
-                     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block leading-snug max-w-[120px] md:max-w-none md:whitespace-nowrap">{kpi.title}</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{formatNum(kpi.mainNumber)}</span><span className="text-[13px] md:text-[14px] text-secondary font-medium uppercase">Հատ</span></div></div>
-                     {viewMode === 'all' && (
-                        <div className="pl-0 md:pl-[30px] border-l-0 md:border-l" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', borderColor: 'var(--border-color)', flexShrink: 0, minWidth: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block leading-snug max-w-[120px] md:max-w-none md:whitespace-nowrap">Պրոդուկտների Քանակ</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{kpi.subtext.replace('Դիտարկվում է ', '').replace(' պրոդուկտ', '')}</span><span className="text-[12px] md:text-[13px] text-secondary font-medium uppercase tracking-wider">Տեսակ</span></div></div>
+            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card mb-4" style={{ padding: isMobile ? '14px 16px' : '12px 20px', borderRadius: '18px' }}>
+               {/* Row 1: Main numbers + Date */}
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: (viewMode === 'all' && (!hasActiveFilters || (filters.periodAStart && filters.periodBStart))) ? '10px' : '0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', flex: 1 }}>
+                     {kpi.isComparison ? (
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '24px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-start' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                                <span style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: 'var(--text-primary)' }}>{formatNum(kpi.mainNumber)}</span>
+                                {/* <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>հատ</span> */}
+                             </div>
+                             <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '-2px' }}>{formatDateRange(filters.periodAStart, filters.periodAEnd)}</span>
+                          </div>
+                          
+                          <div style={{ padding: '4px 10px', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                             <span style={{ fontSize: '16px', fontWeight: '900', color: kpi.trend >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>{kpi.trend >= 0 ? '+' : ''}{kpi.trend.toFixed(1)}%</span>
+                             {kpi.trend >= 0 ? <TrendingUp size={16} className="text-green" /> : <TrendingDown size={16} className="text-red" />}
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'flex-end' : 'flex-start' }}>
+                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                                <span style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: 'var(--text-primary)', opacity: 0.7 }}>{formatNum(kpi.compareNumber)}</span>
+                             </div>
+                             <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '-2px' }}>{formatDateRange(filters.periodBStart, filters.periodBEnd)}</span>
+                          </div>
+                       </div>
+                     ) : (
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                             <span style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '900', color: 'var(--text-primary)', fontFamily: 'inherit' }}>{formatNum(kpi.mainNumber)}</span>
+                             <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Հատ</span>
+                             <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginLeft: '2px' }}>{kpi.title}</span>
+                          </div>
+                          {viewMode === 'all' && (
+                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', paddingLeft: '20px', borderLeft: '1px solid var(--border-color)' }}>
+                                <span style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '900', color: 'var(--text-primary)' }}>{kpi.subtext.replace('Դիտարկվում է ', '').replace(' պրոդուկտ', '')}</span>
+                                <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Տեսակ Պրոդ.</span>
+                             </div>
+                          )}
+                          {viewMode !== 'all' && (
+                             <span style={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: kpi.isDecline ? 'var(--accent-red)' : 'var(--accent-green)', paddingLeft: '16px', borderLeft: '1px solid var(--border-color)' }}>{kpi.subtext}</span>
+                          )}
+                       </div>
                      )}
                   </div>
-                  {viewMode === 'all' && kpi.stats && (
-                     <div className="flex flex-col md:flex-row gap-4 md:gap-12 pt-4 border-t border-[var(--border-color)] border-dashed">
-                        {kpi.stats.map((s, idx) => (
-                           <div key={idx} className="flex items-center gap-3"><span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '10px', fontWeight: 'black', fontSize: '13px', background: s.trend >= 0 ? 'rgba(48, 209, 88, 0.15)' : 'rgba(255, 69, 58, 0.15)', color: s.trend >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>{s.trend >= 0 ? <TrendingUp size={16} strokeWidth={3} /> : <TrendingDown size={16} strokeWidth={3} />}{s.trend > 0 ? '+' : ''}{s.trend.toFixed(1)}%</span><span className="text-[13px] md:text-[14px] font-semibold text-secondary leading-tight">{s.label}</span></div>
-                        ))}
-                     </div>
+                  {!kpi.isComparison && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '5px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                       <Calendar size={12} style={{ opacity: 0.6, flexShrink: 0 }} />
+                       <span>
+                          {(() => {
+                             if (filters.periodAStart && filters.periodAEnd) return formatDateRange(filters.periodAStart, filters.periodAEnd);
+                             const end = new Date(); const start = new Date();
+                             start.setDate(end.getDate() - 29);
+                             return formatDateRange(start.toISOString(), end.toISOString());
+                          })()}
+                       </span>
+                    </div>
                   )}
-                  {viewMode !== 'all' && (<div className="pt-2"><span className="text-sm font-bold" style={{ color: kpi.isDecline ? 'var(--accent-red)' : 'var(--accent-green)' }}>{kpi.subtext}</span></div>)}
                </div>
+               {/* Row 2: Smart comparisons */}
+               {viewMode === 'all' && !hasActiveFilters && kpi.stats && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px dashed var(--border-color)' }}>
+                     {kpi.stats.map((s, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 7px', borderRadius: '6px', fontWeight: '900', fontSize: '11px', background: s.trend >= 0 ? 'rgba(48, 209, 88, 0.12)' : 'rgba(255, 69, 58, 0.12)', color: s.trend >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', whiteSpace: 'nowrap' }}>
+                              {s.trend >= 0 ? <TrendingUp size={12} strokeWidth={3} /> : <TrendingDown size={12} strokeWidth={3} />}
+                              {s.trend > 0 ? '+' : ''}{s.trend.toFixed(1)}%
+                           </span>
+                           <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)' }}>{s.label}</span>
+                        </div>
+                     ))}
+                  </div>
+               )}
+               {viewMode === 'all' && hasActiveFilters && filters.periodAStart && filters.periodBStart && (() => {
+                  const totalA = filteredData.reduce((acc, curr) => acc + curr.current, 0);
+                  const totalB = filteredData.reduce((acc, curr) => acc + curr.previous, 0);
+                  const diff = totalA - totalB;
+                  const pct = totalB > 0 ? (diff / totalB) * 100 : 0;
+                  const isUp = diff >= 0;
+                  return (
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px dashed var(--border-color)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                           <span style={{ fontWeight: '800', color: 'var(--text-primary)' }}>{formatNum(totalA)}</span>
+                           <span style={{ opacity: 0.5 }}>vs</span>
+                           <span style={{ fontWeight: '800', color: 'var(--text-primary)' }}>{formatNum(totalB)}</span>
+                        </div>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '8px', fontWeight: '900', fontSize: '12px', background: isUp ? 'rgba(48, 209, 88, 0.12)' : 'rgba(255, 69, 58, 0.12)', color: isUp ? 'var(--accent-green)' : 'var(--accent-red)', whiteSpace: 'nowrap' }}>
+                           {isUp ? <TrendingUp size={13} strokeWidth={3} /> : <TrendingDown size={13} strokeWidth={3} />}
+                           {isUp ? '+' : ''}{pct.toFixed(1)}%
+                           <span style={{ fontWeight: '600', fontSize: '10px', marginLeft: '2px' }}>({isUp ? '+' : ''}{formatNum(Math.abs(Math.round(diff)))} հատ)</span>
+                        </span>
+                     </div>
+                  );
+               })()}
             </motion.div>
 
             <div style={{ 
