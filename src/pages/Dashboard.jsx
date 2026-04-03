@@ -1080,32 +1080,43 @@ const Dashboard = () => {
                        <AnimatePresence>
                          {showGraphDatePicker && (
                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
-                             <div className="range-picker-container" style={{ margin: '8px 0', background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', padding: '8px' }}>
-                               <DateRange
-                                 editableDateInputs={true}
-                                 onChange={item => {
-                                   const sel = item.selection;
-                                   setGraphRange(sel);
-                                   const s = format(sel.startDate, 'yyyy-MM-dd');
-                                   const e = format(sel.endDate, 'yyyy-MM-dd');
-                                   if (s !== e) {
-                                     setShowGraphDatePicker(false);
-                                     setChartRange('custom');
-                                     fetchProductGraph(selectedProduct, 'custom', s, e);
-                                   }
-                                 }}
-                                 moveRangeOnFirstSelection={false}
-                                 ranges={[graphRange]}
-                                 rangeColors={['var(--accent-blue)']}
-                                />
-                               <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                                 <button onClick={() => setShowGraphDatePicker(false)} style={{ flex: 1, padding: '8px', borderRadius: '10px', border: '1px solid var(--border-color)', fontSize: '12px', fontWeight: 'bold' }}>Չեղարկել</button>
+                             <div className="range-picker-container" style={{ margin: '8px 0', background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', padding: isMobile ? '4px' : '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                               <div style={{ 
+                                 transform: isMobile ? 'scale(0.85)' : 'none', 
+                                 transformOrigin: 'top center',
+                                 width: '100%',
+                                 display: 'flex',
+                                 justifyContent: 'center',
+                                 height: isMobile ? '280px' : 'auto'
+                               }}>
+                                 <DateRange
+                                   editableDateInputs={true}
+                                   onChange={item => {
+                                     const sel = item.selection;
+                                     setGraphRange(sel);
+                                     const s = format(sel.startDate, 'yyyy-MM-dd');
+                                     const e = format(sel.endDate, 'yyyy-MM-dd');
+                                     if (s !== e) {
+                                       setShowGraphDatePicker(false);
+                                       setChartRange('custom');
+                                       fetchProductGraph(selectedProduct, 'custom', s, e);
+                                     }
+                                   }}
+                                   moveRangeOnFirstSelection={false}
+                                   ranges={[graphRange]}
+                                   rangeColors={['var(--accent-blue)']}
+                                   staticRanges={[]}
+                                   inputRanges={[]}
+                                  />
+                               </div>
+                               <div style={{ display: 'flex', gap: '8px', marginTop: '8px', padding: '0 8px 8px 8px', flexDirection: isMobile ? 'column' : 'row' }}>
+                                 <button onClick={() => setShowGraphDatePicker(false)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)', fontSize: '13px', fontWeight: 'bold', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Չեղարկել</button>
                                  <button onClick={() => { 
                                    setShowGraphDatePicker(false); 
                                    const s = format(graphRange.startDate, 'yyyy-MM-dd');
                                    const e = format(graphRange.endDate, 'yyyy-MM-dd');
                                    fetchProductGraph(selectedProduct, 'custom', s, e); 
-                                 }} style={{ flex: 1, padding: '8px', borderRadius: '10px', background: 'var(--accent-blue)', color: 'white', border: 'none', fontSize: '12px', fontWeight: 'bold' }}>Կիրառել</button>
+                                 }} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'var(--accent-blue)', color: 'white', border: 'none', fontSize: '13px', fontWeight: 'bold' }}>Կիրառել</button>
                                </div>
                              </div>
                            </motion.div>
