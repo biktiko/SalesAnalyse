@@ -9,14 +9,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Root endpoint for simple Health Checks (Cron-job.org / Render.com)
-app.get('/', (req, res) => res.send('OK'));
+// Healthy endpoint for Cron-job or Render monitoring
+app.get('/', (req, res) => res.send('Backend is LIVE and Healthy'));
 
 const SSH_CONFIG = {
   host: process.env.SSH_HOST || '51.158.61.4',
   port: 22,
   username: process.env.SSH_USER,
-  password: process.env.SSH_PASS
+  password: process.env.SSH_PASS,
+  readyTimeout: 15000 // Increase timeout for slow Render connections
 };
 
 const DB_CONFIG = {
@@ -27,51 +28,53 @@ const DB_CONFIG = {
   database: process.env.DB_NAME || 'QRBonus' 
 };
 
-// Generic query executor for development
 app.post('/api/query', async (req, res) => {
   const { queryText } = req.body;
   
   if (!queryText) {
-    return res.status(400).json({ error: 'Query text is required' });
+    return res.status(400).json({ error: 'Missing queryText' });
   }
 
   const ssh = new SSHClient();
   let server = null;
-  const localPort = Math.floor(Math.random() * (60000 - 10000 + 1)) + 10000; 
+  // Use a predictable local port for the tunnel to avoid Render port blocking
+  const tunnelPort = 5433; 
 
-  // Cleanup helper function
   const cleanup = () => {
     if (server) {
-      server.close();
+      server.close(() => console.log('Tunnel server closed.'));
       server = null;
     }
     ssh.end();
   };
 
   ssh.on('ready', () => {
+    console.log('SSH Tunnel: Connection Established');
+    
     server = net.createServer((socket) => {
-      ssh.forwardOut('127.0.0.1', 12345, DB_CONFIG.host, DB_CONFIG.port, (err, stream) => {
-        if (err) { 
-          socket.end(); 
-          return; 
+      ssh.forwardOut('127.0.0.1', socket.remotePort, DB_CONFIG.host, DB_CONFIG.port, (err, stream) => {
+        if (err) {
+          console.error('Forward Error:', err.message);
+          socket.end();
+          return;
         }
         socket.pipe(stream);
         stream.pipe(socket);
       });
     });
-    
-    server.listen(localPort, '127.0.0.1', async () => {
+
+    server.listen(tunnelPort, '127.0.0.1', async () => {
       const pgClient = new Client({
         host: '127.0.0.1',
-        port: localPort,
+        port: tunnelPort,
         user: DB_CONFIG.user,
         password: DB_CONFIG.password,
-        database: DB_CONFIG.database
+        database: DB_CONFIG.database,
+        connectionTimeoutMillis: 5000
       });
-      
-      // CRITICAL: Handle unexpected client errors to prevent process crash
+
       pgClient.on('error', (err) => {
-        console.error('Unexpected PG Client Error:', err.message);
+        console.error('PG Client Error during op:', err.message);
         cleanup();
       });
 
@@ -79,7 +82,6 @@ app.post('/api/query', async (req, res) => {
         await pgClient.connect();
         const result = await pgClient.query(queryText);
         
-        // Return result BEFORE closing to ensure no "Connection terminated" error while sending
         res.json({
           success: true,
           rowCount: result.rowCount,
@@ -87,36 +89,43 @@ app.post('/api/query', async (req, res) => {
           fields: result.fields.map(f => f.name)
         });
 
-        // Graceful termination
         await pgClient.end();
         cleanup();
       } catch (dbErr) {
-        console.error('Database Error:', dbErr.message);
+        console.error('Database Operation Failed:', dbErr.message);
         cleanup();
         if (!res.headersSent) {
-          res.status(500).json({ error: 'Database Error', message: dbErr.message });
+          res.status(500).json({ 
+            error: 'DB_ERROR', 
+            message: dbErr.message,
+            hint: 'Check if DB credentials on Render are correct.' 
+          });
         }
       }
     });
 
     server.on('error', (err) => {
-      console.error('Local Server Error:', err.message);
+      console.error('Tunnel Server Failed:', err.message);
       cleanup();
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Tunnel Server Error', message: err.message });
+        res.status(500).json({ error: 'TUNNEL_ERROR', message: err.message });
       }
     });
 
   }).on('error', (err) => {
-    console.error('SSH Client Error:', err.message);
+    console.error('SSH Authentication Failed:', err.message);
     cleanup();
     if (!res.headersSent) {
-      res.status(500).json({ error: 'SSH Error', message: err.message });
+      res.status(500).json({ 
+        error: 'SSH_AUTH_ERROR', 
+        message: err.message,
+        hint: 'Verify SSH_USER and SSH_PASS environment variables on Render.' 
+      });
     }
   }).connect(SSH_CONFIG);
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`API Server running on port ${PORT}`);
+  console.log(`Server listening on 0.0.0.0:${PORT}`);
 });
