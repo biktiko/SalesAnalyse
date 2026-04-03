@@ -34,7 +34,9 @@ app.post('/api/query', async (req, res) => {
 
   const ssh = new SSHClient();
   let server = null;
-  const tunnelPort = 5433;
+  // Use a randomized local port to prevent "EADDRINUSE" (Address already in use) 
+  // on Render when multiple requests hit the server simultaneously.
+  const tunnelPort = Math.floor(Math.random() * (60000 - 10000 + 1)) + 10000; 
 
   const cleanup = () => {
     try {
