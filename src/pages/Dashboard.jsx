@@ -159,8 +159,14 @@ const Dashboard = () => {
   }, []);
 
   const [modalData, setModalData] = useState([]);
-  const [chartRange, setChartRange] = useState('30days'); // 30days, 90days, 180days, 1year
+  const [chartRange, setChartRange] = useState('30days'); // 30days, 90days, 180days, 1year, custom
   const [chartGroup, setChartGroup] = useState('day'); // day, week, month
+  const [graphRange, setGraphRange] = useState({
+     startDate: new Date(),
+     endDate: new Date(),
+     key: 'selection'
+  });
+  const [showGraphDatePicker, setShowGraphDatePicker] = useState(false);
 
   const startProgressBar = () => {
     setProgress(15);
@@ -441,22 +447,29 @@ const Dashboard = () => {
   };
 
   // Graph Caching
-  const getCachedGraph = (id, range) => {
+  const getCachedGraph = (id, range, start = '', end = '') => {
      try {
-        const item = sessionStorage.getItem(`graph_${id}_${range}`);
+        const key = range === 'custom' ? `graph_${id}_custom_${start}_${end}` : `graph_${id}_${range}`;
+        const item = sessionStorage.getItem(key);
         if (item) return JSON.parse(item);
      } catch (e) {} return null;
   };
 
-  const setCachedGraph = (id, range, data) => {
-     try { sessionStorage.setItem(`graph_${id}_${range}`, JSON.stringify(data)); } catch (e) {}
+  const setCachedGraph = (id, range, data, start = '', end = '') => {
+     try { 
+        const key = range === 'custom' ? `graph_${id}_custom_${start}_${end}` : `graph_${id}_${range}`;
+        sessionStorage.setItem(key, JSON.stringify(data)); 
+     } catch (e) {}
   };
 
-  const fetchProductGraph = async (product, range) => {
+  const fetchProductGraph = async (product, range, forceStart = '', forceEnd = '') => {
     setSelectedProduct(product);
     
+    const sDate = forceStart || (graphRange.startDate ? format(graphRange.startDate, 'yyyy-MM-dd') : '');
+    const eDate = forceEnd || (graphRange.endDate ? format(graphRange.endDate, 'yyyy-MM-dd') : '');
+    
     // Check if graph already cached
-    const cachedPlot = getCachedGraph(product.id, range);
+    const cachedPlot = getCachedGraph(product.id, range, sDate, eDate);
     if (cachedPlot) {
        setModalData(cachedPlot);
        setModalLoading(false);
@@ -465,10 +478,14 @@ const Dashboard = () => {
 
     setModalLoading(true);
     const pInterval = startProgressBar();
-    let intervalStr = '30 days';
-    if (range === '90days') intervalStr = '90 days';
-    if (range === '180days') intervalStr = '180 days';
-    if (range === '1year') intervalStr = '1 year';
+    
+    let dateFilter = `delivery_date >= CURRENT_DATE - INTERVAL '30 days'`;
+    if (range === '90days') dateFilter = `delivery_date >= CURRENT_DATE - INTERVAL '90 days'`;
+    else if (range === '180days') dateFilter = `delivery_date >= CURRENT_DATE - INTERVAL '180 days'`;
+    else if (range === '1year') dateFilter = `delivery_date >= CURRENT_DATE - INTERVAL '1 year'`;
+    else if (range === 'custom' && sDate && eDate) {
+      dateFilter = `delivery_date >= '${sDate}' AND delivery_date <= '${eDate}'`;
+    }
 
     const activePromos = await getPromotions();
     const relevantPromos = activePromos.filter(p => p.products.some(prod => String(prod.productId) === String(product.id)));
@@ -478,7 +495,7 @@ const Dashboard = () => {
     const query = `
       SELECT TO_CHAR(delivery_date, 'YYYY-MM-DD') as date_str, MAX(product_name) as product_name, SUM(sold_count) as total
       FROM public.vw_sales_report
-      WHERE ${whereClause} AND delivery_date >= CURRENT_DATE - INTERVAL '${intervalStr}'
+      WHERE ${whereClause} AND ${dateFilter}
       GROUP BY TO_CHAR(delivery_date, 'YYYY-MM-DD'), product_name
       ORDER BY date_str ASC
     `;
@@ -511,7 +528,7 @@ const Dashboard = () => {
 
       let rawData = Object.keys(datesMap).sort().map(date => ({ date, total: datesMap[date] }));
       setModalData(rawData);
-      setCachedGraph(product.id, range, rawData);
+      setCachedGraph(product.id, range, rawData, sDate, eDate);
       finishProgressBar(pInterval);
     } catch (err) {
       console.error("Modal Fetch Error:", err);
@@ -663,10 +680,13 @@ const Dashboard = () => {
                              <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginLeft: '2px' }}>{kpi.title}</span>
                           </div>
                           {viewMode === 'all' && (
-                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', paddingLeft: '20px', borderLeft: '1px solid var(--border-color)' }}>
-                                <span style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '900', color: 'var(--text-primary)' }}>{kpi.subtext.replace('Դիտարկվում է ', '').replace(' պրոդուկտ', '')}</span>
-                                <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Տեսակ Պրոդ.</span>
-                             </div>
+                             <>
+                                <div style={{ width: '1px', height: '24px', background: 'var(--border-color)', margin: isMobile ? '0 4px' : '0 12px', flexShrink: 0 }} />
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                                   <span style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '900', color: 'var(--text-primary)' }}>{kpi.subtext.replace('Դիտարկվում է ', '').replace(' պրոդուկտ', '')}</span>
+                                   <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Տեսակ Պրոդ.</span>
+                                </div>
+                             </>
                           )}
                           {viewMode !== 'all' && (
                              <span style={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: kpi.isDecline ? 'var(--accent-red)' : 'var(--accent-green)', paddingLeft: '16px', borderLeft: '1px solid var(--border-color)' }}>{kpi.subtext}</span>
@@ -1025,19 +1045,89 @@ const Dashboard = () => {
 
         <AnimatePresence>
            {selectedProduct && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setSelectedProduct(null)}>
-                 <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-primary)', width: '100%', maxWidth: '800px', borderRadius: '24px', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
-                    <div style={{ padding: '24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}><div><h2 style={{ fontSize: '20px', fontWeight: 'bold', lineHeight: '1.3', paddingRight: '20px' }}>{selectedProduct.name}</h2></div><button onClick={() => setSelectedProduct(null)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}><X size={18} /></button></div>
-                    <div style={{ padding: '16px 24px', display: 'flex', flexWrap: 'wrap', gap: '16px', background: 'var(--bg-secondary)', alignItems: 'center', justifyContent: 'space-between' }}>
-                       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={16} className="text-secondary" /><select value={chartRange} onChange={(e) => { setChartRange(e.target.value); fetchProductGraph(selectedProduct, e.target.value); }} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}><option value="30days">Վերջին 30 օր</option><option value="90days">Վերջին 90 օր</option><option value="180days">Վերջին 180 օր</option><option value="1year">Վերջին 1 տարի</option></select></div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Filter size={16} className="text-secondary" /><select value={chartGroup} onChange={(e) => setChartGroup(e.target.value)} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', outline: 'none' }}><option value="day">Ըստ օրերի</option><option value="week">Ըստ շաբաթների</option><option value="month">Ըստ ամիսների</option></select></div>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '0' : '16px' }} onClick={() => setSelectedProduct(null)}>
+                 <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-primary)', width: '100%', maxWidth: '800px', borderRadius: isMobile ? '0' : '24px', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: isMobile ? '100%' : 'auto', maxHeight: isMobile ? '100%' : '90vh' }}>
+                    <div style={{ padding: isMobile ? '16px 20px' : '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div style={{ flex: 1, minWidth: 0 }}>
+                          <h2 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '900', lineHeight: '1.3', paddingRight: '12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                             {selectedProduct.name}
+                          </h2>
                        </div>
-                       {!modalLoading && chartProcessedData.length > 0 && (<div style={{ background: 'var(--bg-primary)', padding: '6px 16px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', fontWeight: 'bold', fontSize: '14px' }}>Ընդհանուր՝ <span className="text-blue">{formatNum(summaryTotal)}</span></div>)}
+                       <button onClick={() => setSelectedProduct(null)} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%', width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}><X size={isMobile ? 18 : 20} /></button>
                     </div>
-                    <div style={{ padding: '24px', flex: 1, minHeight: '350px' }}>
-                       {modalLoading ? (<div className="flex flex-col items-center justify-center h-full text-secondary"><Loader2 size={32} className="animate-spin mb-4 text-blue" /><p>Ստացվում են վաճառքի պատմության տվյալները...</p></div>) : chartProcessedData.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-secondary"><AlertTriangle size={36} className="mb-4 text-orange-500" /><p className="font-bold text-lg">Այս ժամանակահատվածում վաճառքներ չկան</p></div>) : (
-                          <div style={{ width: '100%', height: '300px' }}><ResponsiveContainer width="100%" height="100%"><BarChart data={chartProcessedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" /><XAxis dataKey="date" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} tickMargin={10} axisLine={false} tickLine={false} /><YAxis tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(val) => val >= 1000 ? (val/1000).toFixed(1)+'k' : val} /><Tooltip cursor={{ fill: 'rgba(10, 132, 255, 0.05)' }} contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold' }} formatter={(value) => [formatNum(value) + ' հատ', 'Վաճառք']} labelStyle={{ color: 'var(--text-secondary)', marginBottom: '4px' }} /><Bar dataKey="total" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} maxBarSize={50} /></BarChart></ResponsiveContainer></div>
+                    <div style={{ padding: isMobile ? '12px 16px' : '12px 24px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
+                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-primary)', padding: '4px 8px', borderRadius: '10px', border: '1px solid var(--border-color)', flex: isMobile ? '1 1 calc(50% - 4px)' : 'none' }}>
+                            <Calendar size={14} className={chartRange === 'custom' ? 'text-blue' : 'text-secondary'} style={{ cursor: 'pointer' }} onClick={() => setShowGraphDatePicker(true)} />
+                            <select value={chartRange} onChange={(e) => { setChartRange(e.target.value); if (e.target.value !== 'custom') { fetchProductGraph(selectedProduct, e.target.value); setShowGraphDatePicker(false); } else setShowGraphDatePicker(true); }} onClick={() => { if (chartRange === 'custom') setShowGraphDatePicker(true); }} style={{ background: 'transparent', border: 'none', padding: '4px 0', fontSize: '12px', outline: 'none', color: 'var(--text-primary)', fontWeight: '600', width: '100%', cursor: 'pointer' }}>
+                              <option value="30days">Վերջին 30 օր</option>
+                              <option value="90days">Վերջին 90 օր</option>
+                              <option value="180days">Վերջին 180 օր</option>
+                              <option value="1year">Վերջին 1 տարի</option>
+                              <option value="custom">📅 Ընտրել օրերը...</option>
+                            </select>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-primary)', padding: '4px 8px', borderRadius: '10px', border: '1px solid var(--border-color)', flex: isMobile ? '1 1 calc(50% - 4px)' : 'none' }}>
+                            <Filter size={14} className="text-secondary" />
+                            <select value={chartGroup} onChange={(e) => setChartGroup(e.target.value)} style={{ background: 'transparent', border: 'none', padding: '4px 0', fontSize: '12px', outline: 'none', color: 'var(--text-primary)', fontWeight: '600', width: '100%' }}>
+                              <option value="day">Ըստ օրերի</option>
+                              <option value="week">Ըստ շաբաթների</option>
+                              <option value="month">Ըստ ամիսների</option>
+                            </select>
+                          </div>
+                       </div>
+
+                       <AnimatePresence>
+                         {showGraphDatePicker && (
+                           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
+                             <div className="range-picker-container" style={{ margin: '8px 0', background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', padding: '8px' }}>
+                               <DateRange
+                                 editableDateInputs={true}
+                                 onChange={item => {
+                                   const sel = item.selection;
+                                   setGraphRange(sel);
+                                   const s = format(sel.startDate, 'yyyy-MM-dd');
+                                   const e = format(sel.endDate, 'yyyy-MM-dd');
+                                   if (s !== e) {
+                                     setShowGraphDatePicker(false);
+                                     setChartRange('custom');
+                                     fetchProductGraph(selectedProduct, 'custom', s, e);
+                                   }
+                                 }}
+                                 moveRangeOnFirstSelection={false}
+                                 ranges={[graphRange]}
+                                 rangeColors={['var(--accent-blue)']}
+                                />
+                               <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                 <button onClick={() => setShowGraphDatePicker(false)} style={{ flex: 1, padding: '8px', borderRadius: '10px', border: '1px solid var(--border-color)', fontSize: '12px', fontWeight: 'bold' }}>Չեղարկել</button>
+                                 <button onClick={() => { 
+                                   setShowGraphDatePicker(false); 
+                                   const s = format(graphRange.startDate, 'yyyy-MM-dd');
+                                   const e = format(graphRange.endDate, 'yyyy-MM-dd');
+                                   fetchProductGraph(selectedProduct, 'custom', s, e); 
+                                 }} style={{ flex: 1, padding: '8px', borderRadius: '10px', background: 'var(--accent-blue)', color: 'white', border: 'none', fontSize: '12px', fontWeight: 'bold' }}>Կիրառել</button>
+                               </div>
+                             </div>
+                           </motion.div>
+                         )}
+                       </AnimatePresence>
+
+                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          {chartRange === 'custom' && graphRange.startDate && (
+                            <div onClick={() => setShowGraphDatePicker(true)} style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                              <Calendar size={12} /> {formatDateRange(format(graphRange.startDate, 'yyyy-MM-dd'), format(graphRange.endDate, 'yyyy-MM-dd'))}
+                            </div>
+                          )}
+                          {!modalLoading && chartProcessedData.length > 0 && (
+                            <div style={{ background: 'var(--bg-primary)', padding: '6px 12px', borderRadius: '10px', fontWeight: '900', fontSize: '12px', marginLeft: 'auto' }}>
+                               Ընդհանուր՝ <span className="text-blue">{formatNum(summaryTotal)}</span>
+                            </div>
+                          )}
+                       </div>
+                    </div>
+                    <div style={{ padding: isMobile ? '10px' : '20px', flex: 1, minHeight: isMobile ? '280px' : '350px', overflowY: 'auto' }}>
+                       {modalLoading ? (<div className="flex flex-col items-center justify-center h-full py-12 text-secondary"><Loader2 size={32} className="animate-spin mb-4 text-blue" /><p style={{fontSize: '13px'}}>Ստացվում են տվյալները...</p></div>) : chartProcessedData.length === 0 ? (<div className="flex flex-col items-center justify-center h-full py-12 text-secondary"><AlertTriangle size={36} className="mb-4 text-orange-500" /><p className="font-bold text-lg">Վաճառքներ չկան</p></div>) : (
+                          <div style={{ width: '100%', height: isMobile ? '250px' : '300px' }}><ResponsiveContainer width="100%" height="100%"><BarChart data={chartProcessedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" /><XAxis dataKey="date" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} tickMargin={10} axisLine={false} tickLine={false} tickFormatter={(val) => isMobile && chartProcessedData.length > 15 ? '' : val} /><YAxis tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(val) => val >= 1000 ? (val/1000).toFixed(1)+'k' : val} /><Tooltip cursor={{ fill: 'rgba(10, 132, 255, 0.05)' }} contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }} formatter={(value) => [formatNum(value) + ' հատ', 'Վաճառք']} labelStyle={{ color: 'var(--text-secondary)', marginBottom: '4px' }} /><Bar dataKey="total" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} maxBarSize={isMobile ? 30 : 50} /></BarChart></ResponsiveContainer></div>
                        )}
                     </div>
                  </motion.div>
