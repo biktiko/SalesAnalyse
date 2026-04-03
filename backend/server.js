@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Root endpoint for simple Health Checks (Cron-job.org/Render.com)
+// Root endpoint for simple Health Checks (Cron-job.org / Render.com)
 app.get('/', (req, res) => res.send('OK'));
 
 const SSH_CONFIG = {
@@ -39,10 +39,22 @@ app.post('/api/query', async (req, res) => {
   let server = null;
   const localPort = Math.floor(Math.random() * (60000 - 10000 + 1)) + 10000; 
 
+  // Cleanup helper function
+  const cleanup = () => {
+    if (server) {
+      server.close();
+      server = null;
+    }
+    ssh.end();
+  };
+
   ssh.on('ready', () => {
     server = net.createServer((socket) => {
       ssh.forwardOut('127.0.0.1', 12345, DB_CONFIG.host, DB_CONFIG.port, (err, stream) => {
-        if (err) { socket.end(); return; }
+        if (err) { 
+          socket.end(); 
+          return; 
+        }
         socket.pipe(stream);
         stream.pipe(socket);
       });
@@ -57,29 +69,50 @@ app.post('/api/query', async (req, res) => {
         database: DB_CONFIG.database
       });
       
+      // CRITICAL: Handle unexpected client errors to prevent process crash
+      pgClient.on('error', (err) => {
+        console.error('Unexpected PG Client Error:', err.message);
+        cleanup();
+      });
+
       try {
         await pgClient.connect();
         const result = await pgClient.query(queryText);
-        await pgClient.end();
-        server.close();
-        ssh.end();
-
+        
+        // Return result BEFORE closing to ensure no "Connection terminated" error while sending
         res.json({
           success: true,
           rowCount: result.rowCount,
           rows: result.rows,
           fields: result.fields.map(f => f.name)
         });
+
+        // Graceful termination
+        await pgClient.end();
+        cleanup();
       } catch (dbErr) {
-        if (server) server.close();
-        ssh.end();
-        res.status(500).json({ error: 'Database Error', message: dbErr.message });
+        console.error('Database Error:', dbErr.message);
+        cleanup();
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Database Error', message: dbErr.message });
+        }
       }
     });
-    
+
+    server.on('error', (err) => {
+      console.error('Local Server Error:', err.message);
+      cleanup();
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Tunnel Server Error', message: err.message });
+      }
+    });
+
   }).on('error', (err) => {
-    if (server) server.close();
-    res.status(500).json({ error: 'SSH Error', message: err.message });
+    console.error('SSH Client Error:', err.message);
+    cleanup();
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'SSH Error', message: err.message });
+    }
   }).connect(SSH_CONFIG);
 });
 
