@@ -611,74 +611,87 @@ const Dashboard = () => {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
-               {[{ id: 'all', label: 'Բոլորը' }, { id: 'growth', label: 'Աճ' }, { id: 'decline', label: 'Անկում' }].map(tab => (
-                 <button key={tab.id} onClick={() => setViewMode(tab.id)} style={{ padding: '10px 24px', borderRadius: '14px', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s', background: viewMode === tab.id ? 'var(--text-primary)' : 'var(--bg-secondary)', color: viewMode === tab.id ? 'var(--bg-primary)' : 'var(--text-secondary)', border: viewMode === tab.id ? 'none' : '1px solid var(--border-color)' }}>{tab.label}</button>
-               ))}
+            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card mb-4" style={{ padding: '24px', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
+               <div className="flex flex-col gap-6">
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '30px', marginBottom: '8px' }}>
+                     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block leading-snug max-w-[120px] md:max-w-none md:whitespace-nowrap">{kpi.title}</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{formatNum(kpi.mainNumber)}</span><span className="text-[13px] md:text-[14px] text-secondary font-medium uppercase">Հատ</span></div></div>
+                     {viewMode === 'all' && (
+                        <div className="pl-0 md:pl-[30px] border-l-0 md:border-l" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', borderColor: 'var(--border-color)', flexShrink: 0, minWidth: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block leading-snug max-w-[120px] md:max-w-none md:whitespace-nowrap">Պրոդուկտների Քանակ</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{kpi.subtext.replace('Դիտարկվում է ', '').replace(' պրոդուկտ', '')}</span><span className="text-[12px] md:text-[13px] text-secondary font-medium uppercase tracking-wider">Տեսակ</span></div></div>
+                     )}
+                  </div>
+                  {viewMode === 'all' && kpi.stats && (
+                     <div className="flex flex-col md:flex-row gap-4 md:gap-12 pt-4 border-t border-[var(--border-color)] border-dashed">
+                        {kpi.stats.map((s, idx) => (
+                           <div key={idx} className="flex items-center gap-3"><span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '10px', fontWeight: 'black', fontSize: '13px', background: s.trend >= 0 ? 'rgba(48, 209, 88, 0.15)' : 'rgba(255, 69, 58, 0.15)', color: s.trend >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>{s.trend >= 0 ? <TrendingUp size={16} strokeWidth={3} /> : <TrendingDown size={16} strokeWidth={3} />}{s.trend > 0 ? '+' : ''}{s.trend.toFixed(1)}%</span><span className="text-[13px] md:text-[14px] font-semibold text-secondary leading-tight">{s.label}</span></div>
+                        ))}
+                     </div>
+                  )}
+                  {viewMode !== 'all' && (<div className="pt-2"><span className="text-sm font-bold" style={{ color: kpi.isDecline ? 'var(--accent-red)' : 'var(--accent-green)' }}>{kpi.subtext}</span></div>)}
+               </div>
+            </motion.div>
+
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'row', 
+              gap: '16px', 
+              marginBottom: '16px', 
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: isMobile ? '4px' : '8px', 
+                width: isMobile ? '100%' : 'fit-content',
+                background: isMobile ? 'var(--bg-secondary)' : 'transparent',
+                padding: isMobile ? '4px' : '0',
+                borderRadius: isMobile ? '16px' : '0',
+              }}>
+                {[{ id: 'all', label: 'Բոլորը' }, { id: 'growth', label: 'Աճ' }, { id: 'decline', label: 'Անկում' }].map(tab => (
+                  <button 
+                    key={tab.id} 
+                    onClick={() => setViewMode(tab.id)} 
+                    style={{ 
+                      flex: isMobile ? 1 : 'none',
+                      padding: isMobile ? '10px 8px' : '10px 24px', 
+                      borderRadius: isMobile ? '12px' : '14px', 
+                      fontSize: isMobile ? '13px' : '15px', 
+                      fontWeight: 'bold', 
+                      transition: 'all 0.2s', 
+                      background: viewMode === tab.id ? 'var(--text-primary)' : (isMobile ? 'transparent' : 'var(--bg-secondary)'), 
+                      color: viewMode === tab.id ? 'var(--bg-primary)' : 'var(--text-secondary)', 
+                      border: 'none',
+                      boxShadow: (viewMode === tab.id && isMobile) ? '0 4px 12px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-          <AnimatePresence>
-             {!hasActiveFilters && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
-                   <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', padding: '6px', background: 'var(--bg-secondary)', width: 'fit-content', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
-                      <button 
-                        onClick={() => {
-                          setActiveModes(prev => ({ ...prev, month: !prev.month }));
-                        }}
-                        style={{ 
-                          padding: isMobile ? '8px 12px' : '8px 20px', 
-                          borderRadius: '10px', 
-                          fontSize: '13px', 
-                          fontWeight: 'bold', 
-                          background: activeModes.month ? 'var(--bg-primary)' : 'transparent', 
-                          color: activeModes.month ? 'var(--text-primary)' : 'var(--text-secondary)', 
-                          boxShadow: activeModes.month ? '0 4px 12px rgba(0,0,0,0.08)' : 'none',
-                          border: activeModes.month ? '1px solid var(--border-color)' : '1px solid transparent',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Նախորդ Ամիս
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setActiveModes(prev => ({ ...prev, year: !prev.year }));
-                        }}
-                        style={{ 
-                          padding: isMobile ? '8px 12px' : '8px 20px', 
-                          borderRadius: '10px', 
-                          fontSize: '13px', 
-                          fontWeight: 'bold', 
-                          background: activeModes.year ? 'var(--bg-primary)' : 'transparent', 
-                          color: activeModes.year ? 'var(--text-primary)' : 'var(--text-secondary)', 
-                          boxShadow: activeModes.year ? '0 4px 12px rgba(0,0,0,0.08)' : 'none',
-                          border: activeModes.year ? '1px solid var(--border-color)' : '1px solid transparent',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Նախորդ Տարի
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setActiveModes(prev => ({ ...prev, avg: !prev.avg }));
-                        }}
-                        style={{ 
-                          padding: isMobile ? '8px 12px' : '8px 20px', 
-                          borderRadius: '10px', 
-                          fontSize: '13px', 
-                          fontWeight: 'bold', 
-                          background: activeModes.avg ? 'var(--bg-primary)' : 'transparent', 
-                          color: activeModes.avg ? 'var(--text-primary)' : 'var(--text-secondary)', 
-                          boxShadow: activeModes.avg ? '0 4px 12px rgba(0,0,0,0.08)' : 'none',
-                          border: activeModes.avg ? '1px solid var(--border-color)' : '1px solid transparent',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Միջինում օրական
-                      </button>
-                   </div>
-                </motion.div>
-             )}
-          </AnimatePresence>
+            {isMobile && (
+              <AnimatePresence>
+                {!hasActiveFilters && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '4px', 
+                      marginBottom: '16px',
+                      padding: '6px', 
+                      background: 'var(--bg-secondary)', 
+                      width: '100%', 
+                      borderRadius: '14px', 
+                      border: '1px solid var(--border-color)' 
+                    }}>
+                        <button onClick={() => setActiveModes(prev => ({ ...prev, month: !prev.month }))} style={{ flex: 1, padding: '8px 4px', borderRadius: '10px', fontSize: '11px', fontWeight: 'bold', background: activeModes.month ? 'var(--bg-primary)' : 'transparent', color: activeModes.month ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.month ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.month ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախորդ Ամիս</button>
+                        <button onClick={() => setActiveModes(prev => ({ ...prev, year: !prev.year }))} style={{ flex: 1, padding: '8px 4px', borderRadius: '10px', fontSize: '11px', fontWeight: 'bold', background: activeModes.year ? 'var(--bg-primary)' : 'transparent', color: activeModes.year ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.year ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.year ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախորդ Տարի</button>
+                        <button onClick={() => setActiveModes(prev => ({ ...prev, avg: !prev.avg }))} style={{ flex: 1, padding: '8px 4px', borderRadius: '10px', fontSize: '11px', fontWeight: 'bold', background: activeModes.avg ? 'var(--bg-primary)' : 'transparent', color: activeModes.avg ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.avg ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.avg ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Միջինում օրական</button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
 
          <AnimatePresence>
             {isFilterModalOpen && (
@@ -825,27 +838,12 @@ const Dashboard = () => {
             )}
          </AnimatePresence>
 
-            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card mb-6" style={{ padding: '24px', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
-               <div className="flex flex-col gap-6">
-                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '30px', marginBottom: '8px' }}>
-                     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block leading-snug max-w-[120px] md:max-w-none md:whitespace-nowrap">{kpi.title}</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{formatNum(kpi.mainNumber)}</span><span className="text-[13px] md:text-[14px] text-secondary font-medium uppercase">Հատ</span></div></div>
-                     {viewMode === 'all' && (
-                        <div className="pl-0 md:pl-[30px] border-l-0 md:border-l" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', borderColor: 'var(--border-color)', flexShrink: 0, minWidth: 0 }}><span className="text-secondary text-[13px] md:text-[14px] font-bold mb-2 block leading-snug max-w-[120px] md:max-w-none md:whitespace-nowrap">Պրոդուկտների Քանակ</span><div className="flex items-baseline gap-2"><span className="title-font font-black text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>{kpi.subtext.replace('Դիտարկվում է ', '').replace(' պրոդուկտ', '')}</span><span className="text-[12px] md:text-[13px] text-secondary font-medium uppercase tracking-wider">Տեսակ</span></div></div>
-                     )}
-                  </div>
-                  {viewMode === 'all' && kpi.stats && (
-                     <div className="flex flex-col md:flex-row gap-4 md:gap-12 pt-4 border-t border-[var(--border-color)] border-dashed">
-                        {kpi.stats.map((s, idx) => (
-                           <div key={idx} className="flex items-center gap-3"><span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '10px', fontWeight: 'black', fontSize: '13px', background: s.trend >= 0 ? 'rgba(48, 209, 88, 0.15)' : 'rgba(255, 69, 58, 0.15)', color: s.trend >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>{s.trend >= 0 ? <TrendingUp size={16} strokeWidth={3} /> : <TrendingDown size={16} strokeWidth={3} />}{s.trend > 0 ? '+' : ''}{s.trend.toFixed(1)}%</span><span className="text-[13px] md:text-[14px] font-semibold text-secondary leading-tight">{s.label}</span></div>
-                        ))}
-                     </div>
-                  )}
-                  {viewMode !== 'all' && (<div className="pt-2"><span className="text-sm font-bold" style={{ color: kpi.isDecline ? 'var(--accent-red)' : 'var(--accent-green)' }}>{kpi.subtext}</span></div>)}
+            <div className={`flex w-full gap-3 ${isMobile ? 'mb-4' : 'mb-6'} items-center`}>
+               <div className="glass-card flex-1 flex items-center" style={{ padding: '0 16px', borderRadius: '16px', height: '54px' }}>
+                  <Search size={20} className="text-secondary" />
+                  <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Որոնել անվանումով..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', marginLeft: '12px', fontSize: '15px', width: '100%', height: '100%' }} />
                </div>
-            </motion.div>
 
-            <div className="flex w-full gap-3 mb-6 items-center">
-               <div className="glass-card flex-1 flex items-center" style={{ padding: '0 16px', borderRadius: '16px', height: '54px' }}><Search size={20} className="text-secondary" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Որոնել անվանումով..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', marginLeft: '12px', fontSize: '15px', width: '100%', height: '100%' }} /></div>
                <div className="flex items-center gap-2">
                   {hasActiveFilters && (<button onClick={clearFilters} className="flex items-center justify-center bg-[rgba(255,69,58,0.1)] text-[#FF453A] hover:bg-[rgba(255,69,58,0.2)] transition-colors" style={{ width: '36px', height: '36px', borderRadius: '50%' }}><X size={16} strokeWidth={3} /></button>)}
                   <button onClick={openFilterModal} className="glass-card flex items-center justify-center relative hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: hasActiveFilters ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: hasActiveFilters ? '#fff' : 'var(--text-primary)' }}><Filter size={22} fill={hasActiveFilters ? "currentColor" : "none"} />{hasActiveFilters && <div className="absolute top-[12px] right-[14px] w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--accent-blue)]"></div>}</button>
@@ -856,6 +854,20 @@ const Dashboard = () => {
                     <Download size={22} />
                   </button>
                </div>
+
+               {!isMobile && (
+                  <AnimatePresence>
+                    {!hasActiveFilters && (
+                      <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} style={{ overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', gap: '8px', padding: '6px', background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+                          <button onClick={() => setActiveModes(prev => ({ ...prev, month: !prev.month }))} style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold', background: activeModes.month ? 'var(--bg-primary)' : 'transparent', color: activeModes.month ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.month ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.month ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախորդ Ամիս</button>
+                          <button onClick={() => setActiveModes(prev => ({ ...prev, year: !prev.year }))} style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold', background: activeModes.year ? 'var(--bg-primary)' : 'transparent', color: activeModes.year ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.year ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.year ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախորդ Տարի</button>
+                          <button onClick={() => setActiveModes(prev => ({ ...prev, avg: !prev.avg }))} style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--bg-primary)' : 'transparent', color: activeModes.avg ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.avg ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.avg ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Միջինում օրական</button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+               )}
             </div>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
