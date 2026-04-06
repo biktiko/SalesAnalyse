@@ -208,8 +208,9 @@ const Dashboard = () => {
               ${hasB ? `COALESCE(SUM(CASE WHEN delivery_date >= '${appliedFilters.periodBStart}' AND delivery_date <= '${appliedFilters.periodBEnd}' THEN sold_count ELSE 0 END), 0)` : '0'} as previous_month,
               0 as previous_year
           FROM public.vw_sales_report
-          WHERE (delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}')
-             ${hasB ? `OR (delivery_date >= '${appliedFilters.periodBStart}' AND delivery_date <= '${appliedFilters.periodBEnd}')` : ''}
+          WHERE ((delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}')
+             ${hasB ? `OR (delivery_date >= '${appliedFilters.periodBStart}' AND delivery_date <= '${appliedFilters.periodBEnd}')` : ''})
+          AND product_name != 'Պարտքերի զրոյացում'
           GROUP BY product_id
        `;
     } else {
@@ -221,8 +222,9 @@ const Dashboard = () => {
               COALESCE(SUM(CASE WHEN delivery_date >= CURRENT_DATE - INTERVAL '60 days' AND delivery_date < CURRENT_DATE - INTERVAL '30 days' THEN sold_count ELSE 0 END), 0) as previous_month,
               COALESCE(SUM(CASE WHEN delivery_date >= (CURRENT_DATE - INTERVAL '1 year' - INTERVAL '30 days') AND delivery_date < CURRENT_DATE - INTERVAL '1 year' THEN sold_count ELSE 0 END), 0) as previous_year
           FROM public.vw_sales_report
-          WHERE (delivery_date >= CURRENT_DATE - INTERVAL '60 days') 
-             OR (delivery_date >= CURRENT_DATE - INTERVAL '1 year' - INTERVAL '30 days' AND delivery_date < CURRENT_DATE - INTERVAL '1 year')
+          WHERE ((delivery_date >= CURRENT_DATE - INTERVAL '60 days') 
+             OR (delivery_date >= CURRENT_DATE - INTERVAL '1 year' - INTERVAL '30 days' AND delivery_date < CURRENT_DATE - INTERVAL '1 year'))
+          AND product_name != 'Պարտքերի զրոյացում'
           GROUP BY product_id
        `;
     }
