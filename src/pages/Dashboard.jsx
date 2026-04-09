@@ -92,7 +92,9 @@ const Dashboard = () => {
   const [draftFilters, setDraftFilters] = useState(filters);
   const [showRangeA, setShowRangeA] = useState(false);
   const [showRangeB, setShowRangeB] = useState(false);
-  const hasActiveFilters = filters.periodAStart !== '' || filters.periodAEnd !== '' || filters.diffPercentMin !== '' || filters.diffNumericMin !== '';
+  const hasActiveFilters = filters.periodAStart !== '' || 
+    filters.diffPercentMin !== '' || filters.diffPercentMax !== '' || 
+    filters.diffNumericMin !== '' || filters.diffNumericMax !== '';
 
   const openFilterModal = () => {
      setDraftFilters(filters);
@@ -355,15 +357,27 @@ const Dashboard = () => {
 
   const filteredData = useMemo(() => {
     let result = [...data];
-    if (filters.periodBStart && filters.periodBEnd) {
-       if (filters.diffPercentMin !== '') result = result.filter(r => r.trendMonth >= Number(filters.diffPercentMin));
-       if (filters.diffPercentMax !== '') result = result.filter(r => r.trendMonth <= Number(filters.diffPercentMax));
-       if (filters.diffNumericMin !== '') result = result.filter(r => r.diffMonth >= Number(filters.diffNumericMin));
-       if (filters.diffNumericMax !== '') result = result.filter(r => r.diffMonth <= Number(filters.diffNumericMax));
+    const frame = activeModes.year && !activeModes.month ? 'year' : 'month';
+
+    // Apply Range Filters (Percentage and Numeric)
+    // These now work regardless of whether Period B is explicitly selected
+    // and they automatically target either month or year based on active view mode
+    if (filters.diffPercentMin !== '') {
+      result = result.filter(r => (frame === 'month' ? r.trendMonth : r.trendYear) >= Number(filters.diffPercentMin));
     }
-    const getSmartScore = (item, frame) => {
-      const diff = frame === 'month' ? item.diffMonth : item.diffYear;
-      const volume = item.current + (frame === 'month' ? item.previous : item.prevYear);
+    if (filters.diffPercentMax !== '') {
+      result = result.filter(r => (frame === 'month' ? r.trendMonth : r.trendYear) <= Number(filters.diffPercentMax));
+    }
+    if (filters.diffNumericMin !== '') {
+      result = result.filter(r => (frame === 'month' ? r.diffMonth : r.diffYear) >= Number(filters.diffNumericMin));
+    }
+    if (filters.diffNumericMax !== '') {
+      result = result.filter(r => (frame === 'month' ? r.diffMonth : r.diffYear) <= Number(filters.diffNumericMax));
+    }
+
+    const getSmartScore = (item, f) => {
+      const diff = f === 'month' ? item.diffMonth : item.diffYear;
+      const volume = item.current + (f === 'month' ? item.previous : item.prevYear);
       return diff * Math.sqrt(volume || 1);
     };
 
@@ -579,6 +593,7 @@ const Dashboard = () => {
       const trendYear = totalPrevYear > 0 ? ((totalCurrent - totalPrevYear) / totalPrevYear) * 100 : 0;
       
       if (isComparison) {
+        // For the TOP KPI total compared to total
         const diff = totalCurrent - totalPrevMonth;
         const trend = totalPrevMonth > 0 ? (diff / totalPrevMonth) * 100 : 0;
         return { 
@@ -670,7 +685,7 @@ const Dashboard = () => {
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMobile ? 'flex-end' : 'flex-start' }}>
                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
                                 <span style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: 'var(--text-primary)', opacity: 0.7 }}>{formatNum(kpi.compareNumber)}</span>
-                             </div>
+                              </div>
                              <span style={{ fontSize: '9px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '-2px' }}>{formatDateRange(filters.periodBStart, filters.periodBEnd)}</span>
                           </div>
                        </div>
@@ -725,22 +740,24 @@ const Dashboard = () => {
                   </div>
                )}
                {viewMode === 'all' && hasActiveFilters && filters.periodAStart && filters.periodBStart && (() => {
-                  const totalA = filteredData.reduce((acc, curr) => acc + curr.current, 0);
-                  const totalB = filteredData.reduce((acc, curr) => acc + curr.previous, 0);
+                  const isAvgMode = filters.compareType === 'avg_day';
+                  const totalA = filteredData.reduce((acc, curr) => acc + (isAvgMode ? curr.avgA : curr.current), 0);
+                  const totalB = filteredData.reduce((acc, curr) => acc + (isAvgMode ? curr.avgB : curr.previous), 0);
                   const diff = totalA - totalB;
                   const pct = totalB > 0 ? (diff / totalB) * 100 : 0;
                   const isUp = diff >= 0;
                   return (
                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px dashed var(--border-color)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                           <span style={{ fontWeight: '800', color: 'var(--text-primary)' }}>{formatNum(totalA)}</span>
+                           <span style={{ fontWeight: '800', color: 'var(--text-primary)' }}>{formatNum(Math.round(totalA))}</span>
                            <span style={{ opacity: 0.5 }}>vs</span>
-                           <span style={{ fontWeight: '800', color: 'var(--text-primary)' }}>{formatNum(totalB)}</span>
+                           <span style={{ fontWeight: '800', color: 'var(--text-primary)' }}>{formatNum(Math.round(totalB))}</span>
+                           {isAvgMode && <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--accent-blue)', opacity: 0.8 }}>(ՄԻՋԻՆ)</span>}
                         </div>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '8px', fontWeight: '900', fontSize: '12px', background: isUp ? 'rgba(48, 209, 88, 0.12)' : 'rgba(255, 69, 58, 0.12)', color: isUp ? 'var(--accent-green)' : 'var(--accent-red)', whiteSpace: 'nowrap' }}>
                            {isUp ? <TrendingUp size={13} strokeWidth={3} /> : <TrendingDown size={13} strokeWidth={3} />}
                            {isUp ? '+' : ''}{pct.toFixed(1)}%
-                           <span style={{ fontWeight: '600', fontSize: '10px', marginLeft: '2px' }}>({isUp ? '+' : ''}{formatNum(Math.abs(Math.round(diff)))} հատ)</span>
+                           <span style={{ fontWeight: '600', fontSize: '10px', marginLeft: '2px' }}>({isUp ? '+' : ''}{formatNum(Math.abs(Math.round(diff)))} {isAvgMode ? 'օր.' : 'հատ'})</span>
                         </span>
                      </div>
                   );
