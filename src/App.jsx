@@ -9,7 +9,7 @@ import Settings from './pages/Settings';
 import Develop from './pages/Develop';
 import './index.css';
 
-const Sidebar = ({ onLogout }) => {
+const Sidebar = ({ onLogout, user }) => {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo flex items-center justify-center pt-2">
@@ -24,14 +24,6 @@ const Sidebar = ({ onLogout }) => {
           <Tag size={20} />
           <span>Ակցիաներ</span>
         </NavLink>
-        {/* <NavLink to="/products" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Percent size={20} />
-          <span>Պրոդուկտներ</span>
-        </NavLink> */}
-        {/* <NavLink to="/users" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <UsersIcon size={20} />
-          <span>Օգտատերեր</span>
-        </NavLink> */}
         
         <NavLink to="/develop" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''} text-[#0a84ff]`}>
           <Database size={20} />
@@ -45,7 +37,7 @@ const Sidebar = ({ onLogout }) => {
       </nav>
       <div className="pt-4 mt-2 border-t border-[#8e8e93]/20 text-center">
         <p className="text-[11px] text-secondary font-bold uppercase tracking-widest mb-1">Օգտատեր</p>
-        <p className="text-primary font-bold text-lg">Admin</p>
+        <p className="text-primary font-bold text-lg">{user?.name || 'Admin'}</p>
       </div>
     </aside>
   );
@@ -113,8 +105,27 @@ const MobileNav = () => {
 };
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isAuth') === 'true';
+  });
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('userObj');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
+  const handleLogin = (userObj) => {
+    setUser(userObj);
+    setIsAuthenticated(true);
+    localStorage.setItem('isAuth', 'true');
+    localStorage.setItem('userObj', JSON.stringify(userObj));
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUser(null);
+    localStorage.removeItem('isAuth');
+    localStorage.removeItem('userObj');
+  };
 
   // Keep-alive for Render.com backend
   React.useEffect(() => {
@@ -123,7 +134,6 @@ function App() {
 
     const pingServer = async () => {
       try {
-        // Simple dummy query to keep SSH and DB connection warm
         await fetch(`${api_url}/query`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -135,21 +145,20 @@ function App() {
       }
     };
 
-    // Ping every 30 seconds as requested ("constantly")
     const interval = setInterval(pingServer, 30000);
-    pingServer(); // Immediate first ping
+    pingServer();
 
     return () => clearInterval(interval);
   }, []);
 
   if (!isAuthenticated) {
-    return <Login onLogin={(userObj) => { setUser(userObj); setIsAuthenticated(true); }} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   return (
     <BrowserRouter>
       <div className="app-layout">
-        <Sidebar onLogout={() => setIsAuthenticated(false)} user={user} />
+        <Sidebar onLogout={handleLogout} user={user} />
         <MobileNav />
         <main className="main-content">
           <Routes>
@@ -158,7 +167,7 @@ function App() {
             <Route path="/products" element={<div className="title mb-8">Ապրանքներ (Շուտով)</div>} />
             <Route path="/users" element={<Users />} />
             <Route path="/develop" element={<Develop />} />
-            <Route path="/settings" element={<Settings onLogout={() => setIsAuthenticated(false)} user={user} />} />
+            <Route path="/settings" element={<Settings onLogout={handleLogout} user={user} />} />
           </Routes>
         </main>
       </div>

@@ -1033,8 +1033,8 @@ const Dashboard = () => {
                                     </div>
                                  </div>
                                  <div className="flex flex-col items-end">
-                                    <div style={{ background: item.trendYear > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendYear < 0 ? 'rgba(255, 159, 10, 0.15)' : 'var(--bg-secondary)'), color: item.trendYear > 0 ? 'var(--accent-green)' : (item.trendYear < 0 ? 'var(--accent-orange)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900', marginBottom: '4px' }}>{item.trendYear > 0 ? '+' : ''}{(item.trendYear || 0).toFixed(1)}%</div>
-                                    <span style={{ fontSize: '14px', fontWeight: '900', color: item.diffYear > 0 ? 'var(--accent-green)' : (item.diffYear < 0 ? 'var(--accent-orange)' : 'var(--text-secondary)'), marginRight: '-6px' }}>{item.diffYear > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffYear || 0)) : formatNum(Math.round(item.diffYear || 0))}</span>
+                                    <div style={{ background: item.trendYear > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendYear < 0 ? 'rgba(255, 69, 58, 0.15)' : 'var(--bg-secondary)'), color: item.trendYear > 0 ? 'var(--accent-green)' : (item.trendYear < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900', marginBottom: '4px' }}>{item.trendYear > 0 ? '+' : ''}{(item.trendYear || 0).toFixed(1)}%</div>
+                                    <span style={{ fontSize: '14px', fontWeight: '900', color: item.diffYear > 0 ? 'var(--accent-green)' : (item.diffYear < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), marginRight: '-6px' }}>{item.diffYear > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffYear || 0)) : formatNum(Math.round(item.diffYear || 0))}</span>
                                  </div>
                               </div>
                            )}
