@@ -379,6 +379,16 @@ const Dashboard = () => {
       trendYear: isAvg ? item.trendYearAvg : item.trendYearTot,
       diffYear: isAvg ? item.diffYearAvg : item.diffYearTot
     }));
+
+    // Filter out items that are 0 in all visible/relevant modes
+    result = result.filter(item => {
+      const hasCurrent = item.current > 0;
+      const hasPrevMonth = activeModes.month && item.previous > 0;
+      const hasPrevYear = activeModes.year && item.prevYear > 0;
+      const hasCustomB = filters.periodBStart && filters.periodBEnd && item.previous > 0;
+      
+      return hasCurrent || hasPrevMonth || hasPrevYear || hasCustomB;
+    });
     
     const frame = activeModes.year && !activeModes.month ? 'year' : 'month';
 
