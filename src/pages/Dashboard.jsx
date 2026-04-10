@@ -72,7 +72,7 @@ const Dashboard = () => {
   
   // Navigation State
   const [viewMode, setViewMode] = useState('all'); // 'all', 'growth', 'decline'
-  const [activeModes, setActiveModes] = useState({ month: true, year: true, avg: false });
+  const [activeModes, setActiveModes] = useState({ month: true, year: false, avg: false });
   const [search, setSearch] = useState('');
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
 
@@ -86,8 +86,7 @@ const Dashboard = () => {
     diffPercentMin: '',
     diffPercentMax: '',
     diffNumericMin: '',
-    diffNumericMax: '',
-    compareType: 'total'
+    diffNumericMax: ''
   });
   const [draftFilters, setDraftFilters] = useState(filters);
   const [showRangeA, setShowRangeA] = useState(false);
@@ -108,7 +107,7 @@ const Dashboard = () => {
   };
 
   const clearFilters = () => {
-     const empty = { periodAStart: '', periodAEnd: '', periodBStart: '', periodBEnd: '', diffPercentMin: '', diffPercentMax: '', diffNumericMin: '', diffNumericMax: '', compareType: 'total' };
+     const empty = { periodAStart: '', periodAEnd: '', periodBStart: '', periodBEnd: '', diffPercentMin: '', diffPercentMax: '', diffNumericMin: '', diffNumericMax: '' };
      setFilters(empty);
      setDraftFilters(empty);
      setIsFilterModalOpen(false);
@@ -296,28 +295,26 @@ const Dashboard = () => {
         const avgB = (pm / daysB) || 0;
         const avgY = (py / daysY) || 0;
 
-        let trendMonth = 0;
-        let diffMonth = 0;
-        let trendYear = 0;
-        let diffYear = 0;
+        let trendMonthTot = 0, diffMonthTot = 0, trendYearTot = 0, diffYearTot = 0;
+        let trendMonthAvg = 0, diffMonthAvg = 0, trendYearAvg = 0, diffYearAvg = 0;
 
-        if (appliedFilters.compareType === 'avg_day') {
-           if (avgB > 0) trendMonth = ((avgA - avgB) / avgB) * 100;
-           else if (avgA > 0 && avgB === 0) trendMonth = 100;
-           diffMonth = avgA - avgB;
+        // TOTALS
+        if (pm > 0) trendMonthTot = ((cm - pm) / pm) * 100;
+        else if (cm > 0 && pm === 0) trendMonthTot = 100;
+        diffMonthTot = cm - pm;
 
-           if (avgY > 0) trendYear = ((avgA - avgY) / avgY) * 100;
-           else if (avgA > 0 && avgY === 0) trendYear = 100;
-           diffYear = avgA - avgY;
-        } else {
-           if (pm > 0) trendMonth = ((cm - pm) / pm) * 100;
-           else if (cm > 0 && pm === 0) trendMonth = 100;
-           diffMonth = cm - pm;
+        if (py > 0) trendYearTot = ((cm - py) / py) * 100;
+        else if (cm > 0 && py === 0) trendYearTot = 100;
+        diffYearTot = cm - py;
 
-           if (py > 0) trendYear = ((cm - py) / py) * 100;
-           else if (cm > 0 && py === 0) trendYear = 100;
-           diffYear = cm - py;
-        }
+        // AVERAGES
+        if (avgB > 0) trendMonthAvg = ((avgA - avgB) / avgB) * 100;
+        else if (avgA > 0 && avgB === 0) trendMonthAvg = 100;
+        diffMonthAvg = avgA - avgB;
+
+        if (avgY > 0) trendYearAvg = ((avgA - avgY) / avgY) * 100;
+        else if (avgA > 0 && avgY === 0) trendYearAvg = 100;
+        diffYearAvg = avgA - avgY;
 
         return {
           id: r.product_id,
@@ -330,10 +327,14 @@ const Dashboard = () => {
           avgY,
           daysA,
           daysB,
-          trendMonth,
-          diffMonth,
-          trendYear,
-          diffYear
+          trendMonthTot,
+          diffMonthTot,
+          trendYearTot,
+          diffYearTot,
+          trendMonthAvg,
+          diffMonthAvg,
+          trendYearAvg,
+          diffYearAvg
         };
       });
 
@@ -356,7 +357,15 @@ const Dashboard = () => {
   }, []);
 
   const filteredData = useMemo(() => {
-    let result = [...data];
+    const isAvg = activeModes.avg;
+    let result = data.map(item => ({
+      ...item,
+      trendMonth: isAvg ? item.trendMonthAvg : item.trendMonthTot,
+      diffMonth: isAvg ? item.diffMonthAvg : item.diffMonthTot,
+      trendYear: isAvg ? item.trendYearAvg : item.trendYearTot,
+      diffYear: isAvg ? item.diffYearAvg : item.diffYearTot
+    }));
+    
     const frame = activeModes.year && !activeModes.month ? 'year' : 'month';
 
     // Apply Range Filters (Percentage and Numeric)
@@ -588,21 +597,31 @@ const Dashboard = () => {
       const isComparison = hasActiveFilters && filters.periodAStart && filters.periodBStart;
       const totalPrevMonth = filteredData.reduce((acc, curr) => acc + curr.previous, 0);
       const totalPrevYear = filteredData.reduce((acc, curr) => acc + curr.prevYear, 0);
-      
-      const trendMonth = totalPrevMonth > 0 ? ((totalCurrent - totalPrevMonth) / totalPrevMonth) * 100 : 0;
-      const trendYear = totalPrevYear > 0 ? ((totalCurrent - totalPrevYear) / totalPrevYear) * 100 : 0;
+      const totalAvgA = filteredData.reduce((acc, curr) => acc + curr.avgA, 0);
+      const totalAvgB = filteredData.reduce((acc, curr) => acc + curr.avgB, 0);
+      const totalAvgY = filteredData.reduce((acc, curr) => acc + curr.avgY, 0);
+
+      const trendMonth = totalAvgB > 0 ? ((totalAvgA - totalAvgB) / totalAvgB) * 100 : 0;
+      const trendYear = totalAvgY > 0 ? ((totalAvgA - totalAvgY) / totalAvgY) * 100 : 0;
       
       if (isComparison) {
-        // For the TOP KPI total compared to total
-        const diff = totalCurrent - totalPrevMonth;
-        const trend = totalPrevMonth > 0 ? (diff / totalPrevMonth) * 100 : 0;
+        // Upper row: TOTAL values comparison
+        const diffTotal = totalCurrent - totalPrevMonth;
+        const trendTotal = totalPrevMonth > 0 ? (diffTotal / totalPrevMonth) * 100 : 0;
+        
+        // Lower row: AVERAGE values comparison
+        const diffAvg = totalAvgA - totalAvgB;
+        const trendAvg = totalAvgB > 0 ? (diffAvg / totalAvgB) * 100 : 0;
+
         return { 
           isComparison: true,
           title: "Համեմատական վերլուծություն",
           mainNumber: totalCurrent,
           compareNumber: totalPrevMonth,
-          trend: trend,
-          diff: diff,
+          trend: trendTotal,
+          diff: diffTotal,
+          trendAvg: trendAvg,
+          diffAvg: diffAvg,
           subtext: "Դիտարկվում է " + formatNum(count) + " պրոդուկտ",
         };
       }
@@ -613,7 +632,7 @@ const Dashboard = () => {
         subtext: "Դիտարկվում է " + formatNum(count) + " պրոդուկտ",
         stats: [
           { label: "Նախորդ ամսվա համեմատ " + formatNum(totalPrevMonth), trend: trendMonth },
-          { label: "Նախորդ տարվա համեմատ " + formatNum(totalPrevYear), trend: trendYear }
+          ...(activeModes.year ? [{ label: "Նախորդ տարվա համեմատ " + formatNum(totalPrevYear), trend: trendYear }] : [])
         ]
       };
     } 
@@ -740,11 +759,11 @@ const Dashboard = () => {
                   </div>
                )}
                {viewMode === 'all' && hasActiveFilters && filters.periodAStart && filters.periodBStart && (() => {
-                  const isAvgMode = filters.compareType === 'avg_day';
-                  const totalA = filteredData.reduce((acc, curr) => acc + (isAvgMode ? curr.avgA : curr.current), 0);
-                  const totalB = filteredData.reduce((acc, curr) => acc + (isAvgMode ? curr.avgB : curr.previous), 0);
-                  const diff = totalA - totalB;
-                  const pct = totalB > 0 ? (diff / totalB) * 100 : 0;
+                  const isAvgMode = true; // Always true, based on new requirement
+                  const totalA = filteredData.reduce((acc, curr) => acc + curr.avgA, 0);
+                  const totalB = filteredData.reduce((acc, curr) => acc + curr.avgB, 0);
+                  const diff = kpi.diffAvg;
+                  const pct = kpi.trendAvg;
                   const isUp = diff >= 0;
                   return (
                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px dashed var(--border-color)' }}>
@@ -752,12 +771,12 @@ const Dashboard = () => {
                            <span style={{ fontWeight: '800', color: 'var(--text-primary)' }}>{formatNum(Math.round(totalA))}</span>
                            <span style={{ opacity: 0.5 }}>vs</span>
                            <span style={{ fontWeight: '800', color: 'var(--text-primary)' }}>{formatNum(Math.round(totalB))}</span>
-                           {isAvgMode && <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--accent-blue)', opacity: 0.8 }}>(ՄԻՋԻՆ)</span>}
+                           <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--accent-blue)', opacity: 0.8 }}>(ՕՐԱԿԱՆ)</span>
                         </div>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '8px', fontWeight: '900', fontSize: '12px', background: isUp ? 'rgba(48, 209, 88, 0.12)' : 'rgba(255, 69, 58, 0.12)', color: isUp ? 'var(--accent-green)' : 'var(--accent-red)', whiteSpace: 'nowrap' }}>
                            {isUp ? <TrendingUp size={13} strokeWidth={3} /> : <TrendingDown size={13} strokeWidth={3} />}
                            {isUp ? '+' : ''}{pct.toFixed(1)}%
-                           <span style={{ fontWeight: '600', fontSize: '10px', marginLeft: '2px' }}>({isUp ? '+' : ''}{formatNum(Math.abs(Math.round(diff)))} {isAvgMode ? 'օր.' : 'հատ'})</span>
+                           <span style={{ fontWeight: '600', fontSize: '10px', marginLeft: '2px' }}>({isUp ? '+' : ''}{formatNum(Math.abs(Math.round(diff)))} օրը)</span>
                         </span>
                      </div>
                   );
@@ -955,13 +974,6 @@ const Dashboard = () => {
                            </div>
                         </div>
 
-                        <div>
-                           <label style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '12px', display: 'block', textAlign: 'center' }}>Համեմատել</label>
-                           <div className="flex flex-col sm:flex-row bg-[var(--bg-secondary)] p-1 rounded-2xl border border-[var(--border-color)] gap-1 w-full box-border">
-                              <button onClick={() => setDraftFilters({...draftFilters, compareType: 'total'})} style={{ flex: '1 1 auto', width: '100%', padding: '12px 8px', borderRadius: '12px', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s', background: draftFilters.compareType === 'total' ? 'var(--accent-blue)' : 'transparent', color: draftFilters.compareType === 'total' ? 'white' : 'var(--text-secondary)', border: 'none', lineHeight: '1.2' }}>Ամբողջ Քանակությամբ</button>
-                              <button onClick={() => setDraftFilters({...draftFilters, compareType: 'avg_day'})} style={{ flex: '1 1 auto', width: '100%', padding: '12px 8px', borderRadius: '12px', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s', background: draftFilters.compareType === 'avg_day' ? 'var(--accent-blue)' : 'transparent', color: draftFilters.compareType === 'avg_day' ? 'white' : 'var(--text-secondary)', border: 'none', lineHeight: '1.2' }}>Միջինում 1 Օրում</button>
-                           </div>
-                        </div>
                      </div>
                      <div style={{ padding: isMobile ? '12px 20px' : '20px 28px', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '12px' }}>
                         <button onClick={() => { clearFilters(); setIsFilterModalOpen(false); }} style={{ flex: 1, padding: isMobile ? '12px' : '16px', borderRadius: '18px', fontWeight: '900', fontSize: isMobile ? '14px' : '15px', background: 'rgba(255, 69, 58, 0.1)', color: 'var(--accent-red)', border: 'none' }}>Մաքրել</button>
@@ -972,7 +984,7 @@ const Dashboard = () => {
             )}
          </AnimatePresence>
 
-            <div className={`flex w-full gap-3 ${isMobile ? 'mb-4' : 'mb-6'} items-center`}>
+            <div className={`flex w-full gap-3 flex-wrap ${isMobile ? 'mb-4' : 'mb-6'} items-center`}>
                <div className="glass-card flex-1 flex items-center" style={{ padding: '0 16px', borderRadius: '16px', height: '54px' }}>
                   <Search size={20} className="text-secondary" />
                   <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Որոնել անվանումով..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', marginLeft: '12px', fontSize: '15px', width: '100%', height: '100%' }} />
@@ -990,19 +1002,32 @@ const Dashboard = () => {
                </div>
 
                {!isMobile && (
-                  <AnimatePresence>
-                    {!hasActiveFilters && (
-                      <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} style={{ overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', gap: '8px', padding: '6px', background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
-                          <button onClick={() => setActiveModes(prev => ({ ...prev, month: !prev.month }))} style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold', background: activeModes.month ? 'var(--bg-primary)' : 'transparent', color: activeModes.month ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.month ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.month ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախորդ Ամիս</button>
-                          <button onClick={() => setActiveModes(prev => ({ ...prev, year: !prev.year }))} style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold', background: activeModes.year ? 'var(--bg-primary)' : 'transparent', color: activeModes.year ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.year ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.year ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախորդ Տարի</button>
-                          <button onClick={() => setActiveModes(prev => ({ ...prev, avg: !prev.avg }))} style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--bg-primary)' : 'transparent', color: activeModes.avg ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.avg ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.avg ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Միջինում օրական</button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <>
+                    <AnimatePresence>
+                      {!hasActiveFilters && (
+                        <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} style={{ overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', gap: '8px', padding: '6px', background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px solid var(--border-color)', height: '100%' }}>
+                            <button onClick={() => setActiveModes(prev => ({ ...prev, month: !prev.month }))} style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold', background: activeModes.month ? 'var(--bg-primary)' : 'transparent', color: activeModes.month ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.month ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.month ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախորդ Ամիս</button>
+                            <button onClick={() => setActiveModes(prev => ({ ...prev, year: !prev.year }))} style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold', background: activeModes.year ? 'var(--bg-primary)' : 'transparent', color: activeModes.year ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.year ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.year ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախորդ Տարի</button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <div style={{ display: 'flex', gap: '4px', padding: '6px', background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                      <button onClick={() => setActiveModes(prev => ({...prev, avg: false}))} className="hover-lift" style={{ padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: !activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: !activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Ընդհանուր</button>
+                      <button onClick={() => setActiveModes(prev => ({...prev, avg: true}))} className="hover-lift" style={{ padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Միջինում 1 օրում</button>
+                    </div>
+                  </>
                )}
             </div>
+
+            {isMobile && (
+              <div style={{ display: 'flex', gap: '4px', padding: '6px', background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
+                <button onClick={() => setActiveModes(prev => ({...prev, avg: false}))} style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: !activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: !activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Ընդհանուր</button>
+                <button onClick={() => setActiveModes(prev => ({...prev, avg: true}))} style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Միջինում 1 օրում</button>
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                {loading && data.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary"><p>Բեռնվում են տվյալները...</p></div>) : filteredData.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary glass-card" style={{ borderRadius: '24px' }}><CheckCircle2 size={40} className="mb-4 text-green" /><p className="font-bold text-lg">Տվյալներ չեն գտնվել / Դատարկ է</p></div>) : (
@@ -1035,7 +1060,7 @@ const Dashboard = () => {
                                  </div>
                                  <div className="flex flex-col items-end">
                                     <div style={{ background: item.trendMonth > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendMonth < 0 ? 'rgba(255, 69, 58, 0.15)' : 'var(--bg-secondary)'), color: item.trendMonth > 0 ? 'var(--accent-green)' : (item.trendMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900', marginBottom: '4px' }}>{item.trendMonth > 0 ? '+' : ''}{(item.trendMonth || 0).toFixed(1)}%</div>
-                                    <span style={{ fontSize: '14px', fontWeight: '900', color: item.diffMonth > 0 ? 'var(--accent-green)' : (item.diffMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), marginRight: '-6px' }}>{item.diffMonth > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffMonth || 0)) : formatNum(Math.round(item.diffMonth || 0))}</span>
+                                    <span style={{ fontSize: '14px', fontWeight: '900', color: item.diffMonth > 0 ? 'var(--accent-green)' : (item.diffMonth < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), marginRight: '-6px' }}>{item.diffMonth > 0 ? '+' : ''}{formatNum(Math.round(item.diffMonth || 0))}<span style={{ fontSize: '10px', marginLeft: '2px' }}>{activeModes.avg ? 'օր.' : 'հատ'}</span></span>
                                  </div>
                               </div>
                            )}
@@ -1051,7 +1076,7 @@ const Dashboard = () => {
                                  </div>
                                  <div className="flex flex-col items-end">
                                     <div style={{ background: item.trendYear > 0 ? 'rgba(48, 209, 88, 0.15)' : (item.trendYear < 0 ? 'rgba(255, 69, 58, 0.15)' : 'var(--bg-secondary)'), color: item.trendYear > 0 ? 'var(--accent-green)' : (item.trendYear < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), padding: '6px 12px', borderRadius: '10px', fontSize: '14px', fontWeight: '900', marginBottom: '4px' }}>{item.trendYear > 0 ? '+' : ''}{(item.trendYear || 0).toFixed(1)}%</div>
-                                    <span style={{ fontSize: '14px', fontWeight: '900', color: item.diffYear > 0 ? 'var(--accent-green)' : (item.diffYear < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), marginRight: '-6px' }}>{item.diffYear > 0 ? '+' : ''}{filters.compareType === 'avg_day' ? formatNum(Math.round(item.diffYear || 0)) : formatNum(Math.round(item.diffYear || 0))}</span>
+                                    <span style={{ fontSize: '14px', fontWeight: '900', color: item.diffYear > 0 ? 'var(--accent-green)' : (item.diffYear < 0 ? 'var(--accent-red)' : 'var(--text-secondary)'), marginRight: '-6px' }}>{item.diffYear > 0 ? '+' : ''}{formatNum(Math.round(item.diffYear || 0))}<span style={{ fontSize: '10px', marginLeft: '2px' }}>{activeModes.avg ? 'օր.' : 'հատ'}</span></span>
                                  </div>
                               </div>
                            )}
