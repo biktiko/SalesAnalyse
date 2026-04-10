@@ -47,10 +47,10 @@ const formatDateRange = (startStr, endStr) => {
 };
 
 const getFilterCacheKey = (filtersObj) => {
-   if (!filtersObj) return "default";
-   let key = "default";
+   if (!filtersObj) return "v2_default";
+   let key = "v2_default";
    if (filtersObj.periodAStart && filtersObj.periodAEnd) {
-      key = `custom_${filtersObj.periodAStart}_${filtersObj.periodAEnd}`;
+      key = `v2_custom_${filtersObj.periodAStart}_${filtersObj.periodAEnd}`;
       if (filtersObj.periodBStart && filtersObj.periodBEnd) {
          key += `_vs_${filtersObj.periodBStart}_${filtersObj.periodBEnd}`;
       }
@@ -214,8 +214,8 @@ const Dashboard = () => {
        const hasB = appliedFilters.periodBStart && appliedFilters.periodBEnd;
        query = `
           SELECT 
-              product_id, 
-              MAX(product_name) as product_name, 
+              MIN(product_id) as product_id, 
+              TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, 
               COALESCE(SUM(CASE WHEN delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}' THEN sold_count ELSE 0 END), 0) as current_month,
               ${hasB ? `COALESCE(SUM(CASE WHEN delivery_date >= '${appliedFilters.periodBStart}' AND delivery_date <= '${appliedFilters.periodBEnd}' THEN sold_count ELSE 0 END), 0)` : '0'} as previous_month,
               0 as previous_year
@@ -223,13 +223,13 @@ const Dashboard = () => {
           WHERE ((delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}')
              ${hasB ? `OR (delivery_date >= '${appliedFilters.periodBStart}' AND delivery_date <= '${appliedFilters.periodBEnd}')` : ''})
           AND product_name != 'Պարտքերի զրոյացում'
-          GROUP BY product_id
+          GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
        `;
     } else {
        query = `
           SELECT 
-              product_id, 
-              MAX(product_name) as product_name, 
+              MIN(product_id) as product_id, 
+              TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, 
               COALESCE(SUM(CASE WHEN delivery_date >= CURRENT_DATE - INTERVAL '30 days' THEN sold_count ELSE 0 END), 0) as current_month,
               COALESCE(SUM(CASE WHEN delivery_date >= CURRENT_DATE - INTERVAL '60 days' AND delivery_date < CURRENT_DATE - INTERVAL '30 days' THEN sold_count ELSE 0 END), 0) as previous_month,
               COALESCE(SUM(CASE WHEN delivery_date >= (CURRENT_DATE - INTERVAL '1 year' - INTERVAL '30 days') AND delivery_date < CURRENT_DATE - INTERVAL '1 year' THEN sold_count ELSE 0 END), 0) as previous_year
@@ -237,7 +237,7 @@ const Dashboard = () => {
           WHERE ((delivery_date >= CURRENT_DATE - INTERVAL '60 days') 
              OR (delivery_date >= CURRENT_DATE - INTERVAL '1 year' - INTERVAL '30 days' AND delivery_date < CURRENT_DATE - INTERVAL '1 year'))
           AND product_name != 'Պարտքերի զրոյացում'
-          GROUP BY product_id
+          GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
        `;
     }
 
@@ -275,22 +275,25 @@ const Dashboard = () => {
             const multiplierPY = Number(r.previous_year || 0);
 
             promo.products.forEach(prod => {
-               const pId = String(prod.productId);
+               const rawName = prod.productName || 'Անհայտ';
+               const safeName = rawName.trim().replace(/\.$/, '');
+               const mapKey = safeName.toLowerCase();
                const qty = Number(prod.quantity || 1);
 
-               const existing = productMap.get(pId) || { product_id: pId, product_name: prod.productName || 'Անհայտ', current_month: 0, previous_month: 0, previous_year: 0 };
+               const existing = productMap.get(mapKey) || { product_id: String(prod.productId), product_name: safeName, current_month: 0, previous_month: 0, previous_year: 0 };
                existing.current_month += (multiplierCM * qty);
                existing.previous_month += (multiplierPM * qty);
                existing.previous_year += (multiplierPY * qty);
-               productMap.set(pId, existing);
+               productMap.set(mapKey, existing);
             });
          } else {
-            const pId = String(r.product_id);
-            const existing = productMap.get(pId) || { product_id: pId, product_name: r.product_name, current_month: 0, previous_month: 0, previous_year: 0 };
+            const safeName = r.product_name.trim().replace(/\.$/, '');
+            const mapKey = safeName.toLowerCase();
+            const existing = productMap.get(mapKey) || { product_id: String(r.product_id), product_name: safeName, current_month: 0, previous_month: 0, previous_year: 0 };
             existing.current_month += Number(r.current_month || 0);
             existing.previous_month += Number(r.previous_month || 0);
             existing.previous_year += Number(r.previous_year || 0);
-            productMap.set(pId, existing);
+            productMap.set(mapKey, existing);
          }
       });
 
@@ -526,15 +529,22 @@ const Dashboard = () => {
     }
 
     const activePromos = await getPromotions();
-    const relevantPromos = activePromos.filter(p => p.products.some(prod => String(prod.productId) === String(product.id)));
+    const safeNameStr = product.name.trim().replace(/\.$/, '').toLowerCase();
+    
+    const relevantPromos = activePromos.filter(p => p.products.some(prod => {
+         const pName = prod.productName || 'Անհայտ';
+         return pName.trim().replace(/\.$/, '').toLowerCase() === safeNameStr;
+    }));
+
     const promoNamesSql = relevantPromos.map(p => `'${p.name.replace(/'/g, "''")}'`).join(', ');
-    const whereClause = `(product_id = ${product.id} ${promoNamesSql ? `OR product_name IN (${promoNamesSql})` : ''})`;
+    const safeNameDB = product.name.replace(/'/g, "''");
+    const whereClause = `(TRIM(TRAILING '.' FROM TRIM(product_name)) = '${safeNameDB}' ${promoNamesSql ? `OR TRIM(TRAILING '.' FROM TRIM(product_name)) IN (${promoNamesSql})` : ''})`;
 
     const query = `
-      SELECT TO_CHAR(delivery_date, 'YYYY-MM-DD') as date_str, MAX(product_name) as product_name, SUM(sold_count) as total
+      SELECT TO_CHAR(delivery_date, 'YYYY-MM-DD') as date_str, TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, SUM(sold_count) as total
       FROM public.vw_sales_report
       WHERE ${whereClause} AND ${dateFilter}
-      GROUP BY TO_CHAR(delivery_date, 'YYYY-MM-DD'), product_name
+      GROUP BY TO_CHAR(delivery_date, 'YYYY-MM-DD'), TRIM(TRAILING '.' FROM TRIM(product_name))
       ORDER BY date_str ASC
     `;
     try {
@@ -554,7 +564,7 @@ const Dashboard = () => {
          
          const promo = relevantPromos.find(p => p.name === pName);
          if (promo) {
-             const prodInPromo = promo.products.find(prod => String(prod.productId) === String(product.id));
+             const prodInPromo = promo.products.find(prod => (prod.productName || '').trim().replace(/\.$/, '').toLowerCase() === safeNameStr);
              if (prodInPromo) {
                 sold = sold * Number(prodInPromo.quantity || 1);
              }
