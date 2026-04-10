@@ -14,7 +14,7 @@ const formatNum = (num) => num.toLocaleString('en-US');
 
 const CACHE_KEY = "dashboard_data_cache";
 const CACHE_TIME_KEY = "dashboard_data_time";
-const CACHE_DURATION = 15 * 60 * 1000; // 15 mins
+const CACHE_DURATION = 6 * 60 * 60 * 1000; // 6 hours
 
 const getDaysBetween = (start, end) => {
    if (!start || !end) return 1;
@@ -46,10 +46,22 @@ const formatDateRange = (startStr, endStr) => {
   return `${d1}.${m1}.${y1} - ${d2}.${m2}.${y2}`;
 };
 
-const getCachedData = () => {
+const getFilterCacheKey = (filtersObj) => {
+   if (!filtersObj) return "default";
+   let key = "default";
+   if (filtersObj.periodAStart && filtersObj.periodAEnd) {
+      key = `custom_${filtersObj.periodAStart}_${filtersObj.periodAEnd}`;
+      if (filtersObj.periodBStart && filtersObj.periodBEnd) {
+         key += `_vs_${filtersObj.periodBStart}_${filtersObj.periodBEnd}`;
+      }
+   }
+   return key;
+};
+
+const getCachedData = (keySuffix = "default") => {
    try {
-      const data = sessionStorage.getItem(CACHE_KEY);
-      const time = sessionStorage.getItem(CACHE_TIME_KEY);
+      const data = localStorage.getItem(`${CACHE_KEY}_${keySuffix}`);
+      const time = localStorage.getItem(`${CACHE_TIME_KEY}_${keySuffix}`);
       if (data && time && (Date.now() - Number(time) < CACHE_DURATION)) {
          return JSON.parse(data);
       }
@@ -57,17 +69,16 @@ const getCachedData = () => {
    return null;
 };
 
-const saveCache = (data) => {
+const saveCache = (data, keySuffix = "default") => {
    try {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
-      sessionStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+      localStorage.setItem(`${CACHE_KEY}_${keySuffix}`, JSON.stringify(data));
+      localStorage.setItem(`${CACHE_TIME_KEY}_${keySuffix}`, Date.now().toString());
    } catch (e) {}
 };
 
 const Dashboard = () => {
-  const cached = getCachedData();
-  const [data, setData] = useState(cached || []);
-  const [loading, setLoading] = useState(!cached);
+  const [data, setData] = useState(() => getCachedData() || []);
+  const [loading, setLoading] = useState(() => !getCachedData());
   const [error, setError] = useState(null);
   
   // Navigation State
@@ -184,19 +195,19 @@ const Dashboard = () => {
   };
 
   const fetchAnalytics = async (force = false, appliedFilters = filters) => {
-    const cached = getCachedData();
-    let isSilentUpdate = false;
+    const keySuffix = getFilterCacheKey(appliedFilters);
+    const cached = getCachedData(keySuffix);
 
     if (!force && cached) {
        setData(cached);
        setLoading(false);
-       isSilentUpdate = true;
+       return; // Return immediately to avoid background fetching
     } else {
        setLoading(true);
     }
 
     setError(null);
-    const pInterval = !isSilentUpdate ? startProgressBar() : null;
+    const pInterval = startProgressBar();
 
     let query = ``;
     if (appliedFilters.periodAStart && appliedFilters.periodAEnd) {
@@ -339,7 +350,7 @@ const Dashboard = () => {
       });
 
       setData(processed);
-      saveCache(processed);
+      saveCache(processed, keySuffix);
       if (pInterval) finishProgressBar(pInterval);
     } catch (err) {
       setError(err.message === 'Failed to fetch' ? 'Սերվերը անհասանելի է: Ստուգեք կապը PM2-ի հետ:' : err.message);
@@ -475,15 +486,17 @@ const Dashboard = () => {
   const getCachedGraph = (id, range, start = '', end = '') => {
      try {
         const key = range === 'custom' ? `graph_${id}_custom_${start}_${end}` : `graph_${id}_${range}`;
-        const item = sessionStorage.getItem(key);
-        if (item) return JSON.parse(item);
+        const data = localStorage.getItem(key);
+        const time = localStorage.getItem(`${key}_time`);
+        if (data && time && (Date.now() - Number(time) < CACHE_DURATION)) return JSON.parse(data);
      } catch (e) {} return null;
   };
 
   const setCachedGraph = (id, range, data, start = '', end = '') => {
      try { 
         const key = range === 'custom' ? `graph_${id}_custom_${start}_${end}` : `graph_${id}_${range}`;
-        sessionStorage.setItem(key, JSON.stringify(data)); 
+        localStorage.setItem(key, JSON.stringify(data)); 
+        localStorage.setItem(`${key}_time`, Date.now().toString());
      } catch (e) {}
   };
 
@@ -1016,7 +1029,7 @@ const Dashboard = () => {
 
                     <div style={{ display: 'flex', gap: '4px', padding: '6px', background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
                       <button onClick={() => setActiveModes(prev => ({...prev, avg: false}))} className="hover-lift" style={{ padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: !activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: !activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Ընդհանուր</button>
-                      <button onClick={() => setActiveModes(prev => ({...prev, avg: true}))} className="hover-lift" style={{ padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Միջինում 1 օրում</button>
+                      <button onClick={() => setActiveModes(prev => ({...prev, avg: true}))} className="hover-lift" style={{ padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Օրական</button>
                     </div>
                   </>
                )}
@@ -1025,7 +1038,7 @@ const Dashboard = () => {
             {isMobile && (
               <div style={{ display: 'flex', gap: '4px', padding: '6px', background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
                 <button onClick={() => setActiveModes(prev => ({...prev, avg: false}))} style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: !activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: !activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Ընդհանուր</button>
-                <button onClick={() => setActiveModes(prev => ({...prev, avg: true}))} style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Միջինում 1 օրում</button>
+                <button onClick={() => setActiveModes(prev => ({...prev, avg: true}))} style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Օրական</button>
               </div>
             )}
 
