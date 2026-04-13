@@ -2,6 +2,7 @@ import { ref, get, set } from "firebase/database";
 import { db } from "../firebase";
 
 const DB_PATH = 'promotions';
+const PROD_DB_PATH = 'promo_products';
 
 // Fetch all promotions (Async version)
 export const getPromotions = async () => {
@@ -25,6 +26,36 @@ export const savePromotions = async (promotions) => {
     const promoRef = ref(db, DB_PATH);
     const dataToSave = {};
     promotions.forEach(p => {
+       const { id, ...rest } = p;
+       dataToSave[id] = rest;
+    });
+    await set(promoRef, dataToSave);
+    return true;
+  } catch (e) {
+    console.error("Firebase save error:", e);
+    return false;
+  }
+};
+
+export const getPromoProducts = async () => {
+  try {
+    const promoRef = ref(db, PROD_DB_PATH);
+    const snapshot = await get(promoRef);
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      return Object.entries(data).map(([id, val]) => ({ ...val, id }));
+    }
+  } catch (e) {
+    console.error("Firebase fetch error:", e);
+  }
+  return [];
+};
+
+export const savePromoProducts = async (products) => {
+  try {
+    const promoRef = ref(db, PROD_DB_PATH);
+    const dataToSave = {};
+    products.forEach(p => {
        const { id, ...rest } = p;
        dataToSave[id] = rest;
     });
