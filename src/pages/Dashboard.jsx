@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Loader2, Search, CheckCircle2, X, Calendar, Filter, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { getPromotions } from '../utils/promotions';
+import { getPromotions, getPromoProducts } from '../utils/promotions';
 import { DateRange } from 'react-date-range';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import 'react-date-range/dist/styles.css';
@@ -100,6 +100,7 @@ const Dashboard = () => {
     diffNumericMax: ''
   });
   const [draftFilters, setDraftFilters] = useState(filters);
+  const [mixProducts, setMixProducts] = useState(new Set());
   const [showRangeA, setShowRangeA] = useState(false);
   const [showRangeB, setShowRangeB] = useState(false);
   const hasActiveFilters = filters.periodAStart !== '' || 
@@ -168,6 +169,19 @@ const Dashboard = () => {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const loadMixData = async () => {
+      try {
+        const prods = await getPromoProducts();
+        const mixNames = new Set(prods.filter(p => p.isMix).map(p => p.name.toLowerCase().trim()));
+        setMixProducts(mixNames);
+      } catch (e) {
+        console.error("Failed to load mix products info:", e);
+      }
+    };
+    loadMixData();
   }, []);
 
   const [modalData, setModalData] = useState([]);
@@ -1053,7 +1067,14 @@ const Dashboard = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                {loading && data.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary"><p>Բեռնվում են տվյալները...</p></div>) : filteredData.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary glass-card" style={{ borderRadius: '24px' }}><CheckCircle2 size={40} className="mb-4 text-green" /><p className="font-bold text-lg">Տվյալներ չեն գտնվել / Դատարկ է</p></div>) : (
                   filteredData.map((item) => (
-                     <div key={item.id} onClick={() => fetchProductGraph(item, chartRange)} className="glass-card hover-lift cursor-pointer" style={{ padding: activeModes.avg ? '24px' : '16px 20px', borderRadius: '24px', display: 'flex', flexDirection: 'column', flex: '1 1 calc(50% - 16px)', minWidth: '320px', maxWidth: '100%' }}><h3 style={{ fontSize: '16px', fontWeight: 'bold', lineHeight: '1.4', color: 'var(--text-primary)', marginBottom: activeModes.avg ? '24px' : '12px' }}>{item.name}</h3>
+                     <div key={item.id} onClick={() => fetchProductGraph(item, chartRange)} className="glass-card hover-lift cursor-pointer" style={{ padding: activeModes.avg ? '24px' : '16px 20px', borderRadius: '24px', display: 'flex', flexDirection: 'column', flex: '1 1 calc(50% - 16px)', minWidth: '320px', maxWidth: '100%' }}>                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: activeModes.avg ? '24px' : '12px' }}>
+                            <h3 style={{ fontSize: '16px', fontWeight: 'bold', lineHeight: '1.4', color: 'var(--text-primary)', flex: 1 }}>{item.name}</h3>
+                            {mixProducts.has(item.name.toLowerCase().trim()) && (
+                               <span style={{ fontSize: '10px', background: 'rgba(10, 132, 255, 0.1)', color: 'var(--accent-blue)', padding: '4px 10px', borderRadius: '8px', fontWeight: '900', whiteSpace: 'nowrap', border: '1px solid rgba(10, 132, 255, 0.2)' }}>
+                                  Միայն ակցիայի բաղադրիչ
+                               </span>
+                            )}
+                         </div>
                         <div className={`flex flex-col ${activeModes.avg ? 'gap-6' : 'gap-2'}`}>
                            <div className="flex justify-between items-center bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-color)]">
                               <div className="flex flex-col">
