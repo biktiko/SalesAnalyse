@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { LineChart, Percent, Settings as SettingsIcon, Tag, Menu, X, Users as UsersIcon, Database } from 'lucide-react';
+import { LineChart, Percent, Settings as SettingsIcon, Tag, Menu, X, Users as UsersIcon, Database, Layers } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Promotions from './pages/Promotions';
+import Categories, { preloadCategoriesData } from './pages/Categories';
 import Users from './pages/Users';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
@@ -23,6 +24,11 @@ const Sidebar = ({ onLogout, user }) => {
         <NavLink to="/promotions" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Tag size={20} />
           <span>Ակցիաներ</span>
+        </NavLink>
+        
+        <NavLink to="/categories" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Layers size={20} />
+          <span>Կատեգորիաներ</span>
         </NavLink>
         
         <NavLink to="/develop" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''} text-[#0a84ff]`}>
@@ -74,6 +80,14 @@ const MobileNav = () => {
           >
             <Tag size={20} />
             <span>Ակցիաներ</span>
+          </NavLink>
+          <NavLink 
+            to="/categories" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            onClick={() => setIsOpen(false)}
+          >
+            <Layers size={20} />
+            <span>Կատեգորիաներ</span>
           </NavLink>
           <NavLink 
             to="/users" 
@@ -151,6 +165,13 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      // Warm up caching without blocking the main UI thread
+      preloadCategoriesData().catch(console.error);
+    }
+  }, [isAuthenticated]);
+
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
   }
@@ -164,6 +185,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/promotions" element={<Promotions />} />
+            <Route path="/categories" element={<Categories />} />
             <Route path="/products" element={<div className="title mb-8">Ապրանքներ (Շուտով)</div>} />
             <Route path="/users" element={<Users />} />
             <Route path="/develop" element={<Develop />} />

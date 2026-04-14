@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Trash2, Package, X, Loader2, Edit2, Search, 
-  Database, Tag, Filter, Check, ChevronRight, Hash, Layers
+  Database, Tag, Filter, Check, ChevronRight, Hash, Layers, ArrowUp
 } from 'lucide-react';
 import { getPromotions, savePromotions, getPromoProducts, savePromoProducts } from '../utils/promotions';
 
@@ -355,7 +355,7 @@ const Promotions = () => {
 
                        <div style={{ background: 'var(--bg-primary)', padding: '24px', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
                           <p className="text-secondary" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                            <Hash size={16} color="var(--accent-blue)" /> Ներառված ապրանքների կազմը
+                            <Hash size={16} color="var(--accent-blue)" /> Ներառված պրոդուկտների կազմը
                           </p>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
                              {promo.products.map((item, idx) => (
@@ -612,7 +612,20 @@ const Promotions = () => {
         .btn:hover { transform: translateY(-2px); transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .btn:active { transform: scale(0.96); }
       `}</style>
+       <ScrollToTop />
     </motion.div>
+  );
+};
+
+const ScrollToTop = () => {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const handle = () => setVisible(window.scrollY > 400);
+    window.addEventListener('scroll', handle);
+    return () => window.removeEventListener('scroll', handle);
+  }, []);
+  return (
+    <AnimatePresence>{visible && (<motion.button initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ position: 'fixed', bottom: '24px', right: '24px', width: '50px', height: '50px', borderRadius: '50%', background: 'var(--accent-blue)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 15px rgba(0, 122, 255, 0.3)', zIndex: 1000, border: 'none' }}><ArrowUp size={24} strokeWidth={3} /></motion.button>)}</AnimatePresence>
   );
 };
 

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Loader2, Search, CheckCircle2, X, Calendar, Filter, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Loader2, Search, CheckCircle2, X, Calendar, Filter, ArrowUp, ArrowDown, Download, Layers } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getPromotions, getPromoProducts } from '../utils/promotions';
+import { getCategories } from '../utils/categories';
 import { DateRange } from 'react-date-range';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import 'react-date-range/dist/styles.css';
@@ -172,17 +173,23 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    const loadMixData = async () => {
+    const loadExtraData = async () => {
       try {
         const prods = await getPromoProducts();
         const mixNames = new Set(prods.filter(p => p.isMix).map(p => p.name.toLowerCase().trim()));
         setMixProducts(mixNames);
+
+        const cats = await getCategories();
+        setCategories(cats || []);
       } catch (e) {
-        console.error("Failed to load mix products info:", e);
+        console.error("Failed to load extra products/categories info:", e);
       }
     };
-    loadMixData();
+    loadExtraData();
   }, []);
+
+  const [analyticsMode, setAnalyticsMode] = useState('categories'); // 'categories' or 'products'
+  const [categories, setCategories] = useState([]);
 
   const [modalData, setModalData] = useState([]);
   const [chartRange, setChartRange] = useState('30days'); // 30days, 90days, 180days, 1year, custom
@@ -384,9 +391,98 @@ const Dashboard = () => {
      fetchAnalytics(); 
   }, []);
 
+  const groupedData = useMemo(() => {
+     const prodToCat = new Map();
+     const normalize = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/\.$/, '');
+
+     categories.forEach(c => {
+         if (c.products && Array.isArray(c.products)) {
+             c.products.forEach(p => prodToCat.set(normalize(p), c));
+         }
+     });
+
+     if (analyticsMode === 'products') {
+       return data.map(item => ({
+            ...item,
+            isAssigned: prodToCat.has(normalize(item.name))
+       }));
+     }
+     
+     const catMap = new Map();
+     data.forEach(item => {
+         const safeName = normalize(item.name);
+         const cat = prodToCat.get(safeName);
+         
+         const targetId = cat ? cat.id : `pseudo_${item.id}`;
+         const targetName = cat ? cat.name : item.name;
+
+         const existing = catMap.get(targetId) || {
+            id: targetId,
+            name: targetName,
+            isPseudo: !cat,
+            productsList: cat ? (cat.products || []) : [item.name],
+            matchedCount: 0,
+            current: 0,
+            previous: 0,
+            prevYear: 0,
+            avgA: 0,
+            avgB: 0,
+            avgY: 0,
+            daysA: item.daysA,
+            daysB: item.daysB
+         };
+
+         existing.matchedCount += 1;
+         existing.current += item.current;
+         existing.previous += item.previous;
+         existing.prevYear += item.prevYear;
+         existing.avgA += item.avgA;
+         existing.avgB += item.avgB;
+         existing.avgY += item.avgY;
+
+         catMap.set(targetId, existing);
+     });
+
+     const processedCats = Array.from(catMap.values()).map(r => {
+        const cm = r.current;
+        const pm = r.previous;
+        const py = r.prevYear;
+        const avgA = r.avgA;
+        const avgB = r.avgB;
+        const avgY = r.avgY;
+
+        let trendMonthTot = 0, diffMonthTot = 0, trendYearTot = 0, diffYearTot = 0;
+        let trendMonthAvg = 0, diffMonthAvg = 0, trendYearAvg = 0, diffYearAvg = 0;
+
+        if (pm > 0) trendMonthTot = ((cm - pm) / pm) * 100;
+        else if (cm > 0 && pm === 0) trendMonthTot = 100;
+        diffMonthTot = cm - pm;
+
+        if (py > 0) trendYearTot = ((cm - py) / py) * 100;
+        else if (cm > 0 && py === 0) trendYearTot = 100;
+        diffYearTot = cm - py;
+
+        if (avgB > 0) trendMonthAvg = ((avgA - avgB) / avgB) * 100;
+        else if (avgA > 0 && avgB === 0) trendMonthAvg = 100;
+        diffMonthAvg = avgA - avgB;
+
+        if (avgY > 0) trendYearAvg = ((avgA - avgY) / avgY) * 100;
+        else if (avgA > 0 && avgY === 0) trendYearAvg = 100;
+        diffYearAvg = avgA - avgY;
+
+        return {
+           ...r,
+           trendMonthTot, diffMonthTot, trendYearTot, diffYearTot,
+           trendMonthAvg, diffMonthAvg, trendYearAvg, diffYearAvg
+        };
+     });
+     
+     return processedCats;
+  }, [data, categories, analyticsMode]);
+
   const filteredData = useMemo(() => {
     const isAvg = activeModes.avg;
-    let result = data.map(item => ({
+    let result = groupedData.map(item => ({
       ...item,
       trendMonth: isAvg ? item.trendMonthAvg : item.trendMonthTot,
       diffMonth: isAvg ? item.diffMonthAvg : item.diffMonthTot,
@@ -469,7 +565,11 @@ const Dashboard = () => {
       result = result.filter(i => i.name && i.name.toLowerCase().includes(lowerReq));
     }
     return result;
-  }, [data, viewMode, activeModes, search, sortOrder, filters]);
+  }, [data, groupedData, viewMode, activeModes, search, sortOrder, filters, analyticsMode]);
+
+  const visibleData = useMemo(() => {
+    return filteredData;
+  }, [filteredData]);
 
   const downloadExcel = () => {
     const titleA = (hasActiveFilters && filters.periodAStart && filters.periodAEnd) 
@@ -480,7 +580,7 @@ const Dashboard = () => {
                     ? formatDateRange(filters.periodBStart, filters.periodBEnd)
                     : 'Նախորդ Ամիս';
     
-    const exportData = filteredData.map(item => {
+    const exportData = visibleData.map(item => {
       const row = {
         "Անվանում": item.name,
         [`${titleA} (Ընդհանուր)`]: item.current,
@@ -553,16 +653,42 @@ const Dashboard = () => {
     }
 
     const activePromos = await getPromotions();
-    const safeNameStr = product.name.trim().replace(/\.$/, '').toLowerCase();
+    const productNamesToCheck = product.productsList || [product.name];
     
-    const relevantPromos = activePromos.filter(p => p.products.some(prod => {
-         const pName = prod.productName || 'Անհայտ';
-         return pName.trim().replace(/\.$/, '').toLowerCase() === safeNameStr;
-    }));
+    let allRelevantPromoDbNames = [];
+    let baseDbNames = [];
+    const prodMultipliers = new Map();
+    const validBaseNamesSet = new Set();
+    
+    productNamesToCheck.forEach(prodName => {
+        const safeName = prodName.trim().replace(/\.$/, '');
+        const safeNameStr = safeName.toLowerCase();
+        baseDbNames.push({ dbName: safeName, lowName: safeNameStr });
+        validBaseNamesSet.add(safeNameStr);
+        
+        const relevantPromos = activePromos.filter(p => p.products.some(prod => {
+             const pName = prod.productName || 'Անհայտ';
+             return pName.trim().replace(/\.$/, '').toLowerCase() === safeNameStr;
+        }));
+        
+        relevantPromos.forEach(promo => {
+            const promoNameSafe = promo.name.replace(/\.$/, '');
+            allRelevantPromoDbNames.push(promoNameSafe);
+            const prodInPromo = promo.products.find(prod => (prod.productName || '').trim().replace(/\.$/, '').toLowerCase() === safeNameStr);
+            if (prodInPromo) {
+                const currentQty = prodMultipliers.get(promo.name) || 0;
+                prodMultipliers.set(promo.name, currentQty + Number(prodInPromo.quantity || 1));
+            }
+        });
+    });
 
-    const promoNamesSql = relevantPromos.map(p => `'${p.name.replace(/'/g, "''")}'`).join(', ');
-    const safeNameDB = product.name.replace(/'/g, "''");
-    const whereClause = `(TRIM(TRAILING '.' FROM TRIM(product_name)) = '${safeNameDB}' ${promoNamesSql ? `OR TRIM(TRAILING '.' FROM TRIM(product_name)) IN (${promoNamesSql})` : ''})`;
+    const uniqueBaseNames = [...new Set(baseDbNames.map(b => `'${b.dbName.replace(/'/g, "''")}'`))].join(', ');
+    const uniquePromoNames = [...new Set(allRelevantPromoDbNames.map(n => `'${n.replace(/'/g, "''")}'`))].join(', ');
+
+    const whereClauseParts = [];
+    if (uniqueBaseNames) whereClauseParts.push(`TRIM(TRAILING '.' FROM TRIM(product_name)) IN (${uniqueBaseNames})`);
+    if (uniquePromoNames) whereClauseParts.push(`TRIM(TRAILING '.' FROM TRIM(product_name)) IN (${uniquePromoNames})`);
+    const whereClause = `(${whereClauseParts.join(' OR ')})`;
 
     const query = `
       SELECT TO_CHAR(delivery_date, 'YYYY-MM-DD') as date_str, TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, SUM(sold_count) as total
@@ -584,14 +710,13 @@ const Dashboard = () => {
       let datesMap = {};
       resData.rows.forEach(r => {
          let sold = Number(r.total);
-         const pName = r.product_name;
+         let pName = (r.product_name || '').trim().replace(/\.$/, '');
          
-         const promo = relevantPromos.find(p => p.name === pName);
-         if (promo) {
-             const prodInPromo = promo.products.find(prod => (prod.productName || '').trim().replace(/\.$/, '').toLowerCase() === safeNameStr);
-             if (prodInPromo) {
-                sold = sold * Number(prodInPromo.quantity || 1);
-             }
+         const isPromo = prodMultipliers.has(pName);
+         if (isPromo) {
+             sold = sold * prodMultipliers.get(pName);
+         } else if (!validBaseNamesSet.has(pName.toLowerCase())) {
+             return; // Safely ignore this row to prevent pollution if something weird passes
          }
 
          if (!datesMap[r.date_str]) datesMap[r.date_str] = 0;
@@ -638,7 +763,8 @@ const Dashboard = () => {
 
   const getDynamicKPI = () => {
     const totalCurrent = filteredData.reduce((acc, curr) => acc + curr.current, 0);
-    const count = filteredData.length;
+    const count = analyticsMode === 'products' ? filteredData.length : visibleData.length;
+    const dynamicType = analyticsMode === 'categories' ? "": 'պրոդուկտ';
     
     if (viewMode === 'all') {
       const isComparison = hasActiveFilters && filters.periodAStart && filters.periodBStart;
@@ -669,14 +795,14 @@ const Dashboard = () => {
           diff: diffTotal,
           trendAvg: trendAvg,
           diffAvg: diffAvg,
-          subtext: "Դիտարկվում է " + formatNum(count) + " պրոդուկտ",
+          subtext: "Դիտարկվում է " + formatNum(count) + " " + dynamicType,
         };
       }
 
       return { 
         title: "Ընդհանուր Վաճառք",
         mainNumber: totalCurrent,
-        subtext: "Դիտարկվում է " + formatNum(count) + " պրոդուկտ",
+        subtext: "Դիտարկվում է " + formatNum(count) + " " + dynamicType,
         stats: [
           { label: "Նախորդ ամսվա համեմատ " + formatNum(totalPrevMonth), trend: trendMonth },
           ...(activeModes.year ? [{ label: "Նախորդ տարվա համեմատ " + formatNum(totalPrevYear), trend: trendYear }] : [])
@@ -687,13 +813,23 @@ const Dashboard = () => {
       const frame = activeModes.year && !activeModes.month ? 'year' : 'month';
       const diffKey = frame === 'month' ? 'diffMonth' : 'diffYear';
       const totalLost = filteredData.reduce((acc, curr) => acc + curr[diffKey] || 0, 0);
-      return { title: "Անկումային Պրոդուկտներ", mainNumber: count, subtext: `Ընդհանուր ծավալային անկում՝ ${formatNum(totalLost)} `, isDecline: true };
+      return { 
+        title: analyticsMode === 'categories' ? "Անկումային Կատեգորիա" : "Անկումային Պրոդուկտներ", 
+        mainNumber: count, 
+        subtext: `Ընդհանուր ծավալային անկում՝ ${formatNum(totalLost)} `, 
+        isDecline: true 
+      };
     }
     else {
       const frame = activeModes.year && !activeModes.month ? 'year' : 'month';
       const diffKey = frame === 'month' ? 'diffMonth' : 'diffYear';
       const totalGained = filteredData.reduce((acc, curr) => acc + curr[diffKey] || 0, 0);
-      return { title: "Աճող Պրոդուկտներ", mainNumber: count, subtext: `Ընդհանուր ծավալային աճ՝ +${formatNum(totalGained)}`, isGrowth: true };
+      return { 
+        title: analyticsMode === 'categories' ? "Աճող Կատեգորիա" : "Աճող Պրոդուկտներ", 
+        mainNumber: count, 
+        subtext: `Ընդհանուր ծավալային աճ՝ +${formatNum(totalGained)}`, 
+        isGrowth: true 
+      };
     }
   };
 
@@ -767,7 +903,7 @@ const Dashboard = () => {
                                 <div style={{ width: '1px', height: '24px', background: 'var(--border-color)', margin: isMobile ? '0 4px' : '0 12px', flexShrink: 0 }} />
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
                                    <span style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '900', color: 'var(--text-primary)' }}>{kpi.subtext.replace('Դիտարկվում է ', '').replace(' պրոդուկտ', '')}</span>
-                                   <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Տեսակ Պրոդ.</span>
+                                   <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{analyticsMode === 'categories' ? 'Կատեգորիա' : 'Տեսակ Պրոդ.'}</span>
                                 </div>
                              </>
                           )}
@@ -830,6 +966,7 @@ const Dashboard = () => {
                })()}
             </motion.div>
 
+            {!isMobile && (
             <div style={{ 
               display: 'flex', 
               flexDirection: 'row', 
@@ -841,27 +978,27 @@ const Dashboard = () => {
               <div style={{ 
                 display: 'flex', 
                 flexWrap: 'wrap', 
-                gap: isMobile ? '4px' : '8px', 
-                width: isMobile ? '100%' : 'fit-content',
-                background: isMobile ? 'var(--bg-secondary)' : 'transparent',
-                padding: isMobile ? '4px' : '0',
-                borderRadius: isMobile ? '16px' : '0',
+                gap: '8px', 
+                width: 'fit-content',
+                background: 'transparent',
+                padding: '0',
+                borderRadius: '0',
               }}>
                 {[{ id: 'all', label: 'Բոլորը' }, { id: 'growth', label: 'Աճ' }, { id: 'decline', label: 'Անկում' }].map(tab => (
                   <button 
                     key={tab.id} 
                     onClick={() => setViewMode(tab.id)} 
                     style={{ 
-                      flex: isMobile ? 1 : 'none',
-                      padding: isMobile ? '10px 8px' : '10px 24px', 
-                      borderRadius: isMobile ? '12px' : '14px', 
-                      fontSize: isMobile ? '13px' : '15px', 
+                      flex: 'none',
+                      padding: '10px 24px', 
+                      borderRadius: '14px', 
+                      fontSize: '15px', 
                       fontWeight: 'bold', 
                       transition: 'all 0.2s', 
-                      background: viewMode === tab.id ? 'var(--text-primary)' : (isMobile ? 'transparent' : 'var(--bg-secondary)'), 
+                      background: viewMode === tab.id ? 'var(--text-primary)' : 'var(--bg-secondary)', 
                       color: viewMode === tab.id ? 'var(--bg-primary)' : 'var(--text-secondary)', 
                       border: 'none',
-                      boxShadow: (viewMode === tab.id && isMobile) ? '0 4px 12px rgba(0,0,0,0.1)' : 'none'
+                      boxShadow: 'none'
                     }}
                   >
                     {tab.label}
@@ -869,6 +1006,7 @@ const Dashboard = () => {
                 ))}
               </div>
             </div>
+            )}
 
          <AnimatePresence>
             {isFilterModalOpen && (
@@ -1008,24 +1146,90 @@ const Dashboard = () => {
             )}
          </AnimatePresence>
 
-            <div className={`flex w-full gap-3 flex-wrap ${isMobile ? 'mb-4' : 'mb-6'} items-center`}>
-               <div className="glass-card flex-1 flex items-center" style={{ padding: '0 16px', borderRadius: '16px', height: '54px' }}>
-                  <Search size={20} className="text-secondary" />
-                  <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Որոնել անվանումով..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', marginLeft: '12px', fontSize: '15px', width: '100%', height: '100%' }} />
-               </div>
+            {isMobile ? (
+               <div className="flex flex-col gap-3 mb-4 w-full">
+                  <div className="flex gap-2">
+                     <div style={{ flex: 1, display: 'flex', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '16px', border: '1px solid var(--border-color)', height: '48px', alignItems: 'center' }}>
+                        <button 
+                           onClick={() => setAnalyticsMode('categories')}
+                           style={{ flex: 1, height: '100%', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: analyticsMode === 'categories' ? 'var(--text-primary)' : 'transparent', color: analyticsMode === 'categories' ? 'var(--bg-primary)' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none' }}>
+                           Կատեգորիաներ
+                        </button>
+                        <button 
+                           onClick={() => setAnalyticsMode('products')}
+                           style={{ flex: 1, height: '100%', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: analyticsMode === 'products' ? 'var(--text-primary)' : 'transparent', color: analyticsMode === 'products' ? 'var(--bg-primary)' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none' }}>
+                           Պրոդուկտներ
+                        </button>
+                     </div>
+                     {hasActiveFilters && (<button onClick={clearFilters} className="flex items-center justify-center bg-[rgba(255,69,58,0.1)] text-[#FF453A] shrink-0" style={{ width: '48px', height: '48px', borderRadius: '16px' }}><X size={20} strokeWidth={3} /></button>)}
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '16px', border: '1px solid var(--border-color)', minHeight: '48px' }}>
+                     {[{ id: 'all', label: 'Բոլորը' }, { id: 'growth', label: 'Աճ' }, { id: 'decline', label: 'Անկում' }].map(tab => (
+                        <button key={tab.id} onClick={() => setViewMode(tab.id)} style={{ flex: 1, padding: '10px 8px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: viewMode === tab.id ? 'var(--text-primary)' : 'transparent', color: viewMode === tab.id ? 'var(--bg-primary)' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s', boxShadow: viewMode === tab.id ? '0 4px 12px rgba(0,0,0,0.1)' : 'none' }}>{tab.label}</button>
+                     ))}
+                  </div>
 
-               <div className="flex items-center gap-2">
-                  {hasActiveFilters && (<button onClick={clearFilters} className="flex items-center justify-center bg-[rgba(255,69,58,0.1)] text-[#FF453A] hover:bg-[rgba(255,69,58,0.2)] transition-colors" style={{ width: '36px', height: '36px', borderRadius: '50%' }}><X size={16} strokeWidth={3} /></button>)}
-                  <button onClick={openFilterModal} className="glass-card flex items-center justify-center relative hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: hasActiveFilters ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: hasActiveFilters ? '#fff' : 'var(--text-primary)' }}><Filter size={22} fill={hasActiveFilters ? "currentColor" : "none"} />{hasActiveFilters && <div className="absolute top-[12px] right-[14px] w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--accent-blue)]"></div>}</button>
-                  <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="glass-card flex items-center justify-center hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                    {sortOrder === 'desc' ? <ArrowDown size={22} /> : <ArrowUp size={22} />}
-                  </button>
-                  <button onClick={downloadExcel} className="glass-card flex items-center justify-center hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                    <Download size={22} />
-                  </button>
+                  <div style={{ display: 'flex', gap: '4px', padding: '6px', background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border-color)', minHeight: '48px' }}>
+                     {!hasActiveFilters ? (
+                        <>
+                           <button onClick={() => setActiveModes(prev => ({ ...prev, month: !prev.month }))} style={{ flex: 1, padding: '10px 4px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', background: activeModes.month ? 'var(--bg-primary)' : 'transparent', color: activeModes.month ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.month ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.month ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախ. Ամիս</button>
+                           <button onClick={() => setActiveModes(prev => ({ ...prev, year: !prev.year }))} style={{ flex: 1, padding: '10px 4px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', background: activeModes.year ? 'var(--bg-primary)' : 'transparent', color: activeModes.year ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.year ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.year ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախ. Տարի</button>
+                           <button onClick={() => setActiveModes(prev => ({ ...prev, avg: !prev.avg }))} style={{ flex: 1, padding: '10px 4px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', background: activeModes.avg ? 'var(--bg-primary)' : 'transparent', color: activeModes.avg ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.avg ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.avg ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Միջ. օրական</button>
+                        </>
+                     ) : (
+                        <>
+                           <button onClick={() => setActiveModes(prev => ({...prev, avg: false}))} style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: !activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: !activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Ընդհանուր</button>
+                           <button onClick={() => setActiveModes(prev => ({...prev, avg: true}))} style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Օրական</button>
+                        </>
+                     )}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                     <div className="glass-card flex-1 flex items-center" style={{ padding: '0 16px', borderRadius: '16px', height: '48px' }}>
+                        <Search size={18} className="text-secondary" />
+                        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Որոնել..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', marginLeft: '10px', fontSize: '14px', width: '100%', height: '100%' }} />
+                     </div>
+                     <button onClick={downloadExcel} className="glass-card flex items-center justify-center relative hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                        <Download size={20} />
+                     </button>
+                     <button onClick={openFilterModal} className="glass-card flex items-center justify-center relative hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: hasActiveFilters ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: hasActiveFilters ? '#fff' : 'var(--text-primary)' }}><Filter size={20} fill={hasActiveFilters ? "currentColor" : "none"} />{hasActiveFilters && <div className="absolute top-[10px] right-[10px] w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--accent-blue)]"></div>}</button>
+                     <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="glass-card flex items-center justify-center hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                       {sortOrder === 'desc' ? <ArrowDown size={20} /> : <ArrowUp size={20} />}
+                     </button>
+                  </div>
                </div>
+            ) : (
+               <div className="flex w-full gap-3 mb-6 items-center">
+                  <div style={{ display: 'flex', background: 'var(--bg-secondary)', padding: '6px', borderRadius: '20px', border: '1px solid var(--border-color)', height: '54px', alignItems: 'center' }}>
+                     <button 
+                        onClick={() => setAnalyticsMode('categories')}
+                        style={{ padding: '0 20px', height: '100%', borderRadius: '14px', fontSize: '14px', fontWeight: 'bold', background: analyticsMode === 'categories' ? 'var(--text-primary)' : 'transparent', color: analyticsMode === 'categories' ? 'var(--bg-primary)' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Կատեգորիաներ
+                     </button>
+                     <button 
+                        onClick={() => setAnalyticsMode('products')}
+                        style={{ padding: '0 20px', height: '100%', borderRadius: '14px', fontSize: '14px', fontWeight: 'bold', background: analyticsMode === 'products' ? 'var(--text-primary)' : 'transparent', color: analyticsMode === 'products' ? 'var(--bg-primary)' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Պրոդուկտներ
+                     </button>
+                  </div>
 
-               {!isMobile && (
+                  <div className="glass-card flex-1 flex items-center" style={{ padding: '0 16px', borderRadius: '16px', height: '54px', minWidth: '200px' }}>
+                     <Search size={20} className="text-secondary" />
+                     <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Որոնել..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', marginLeft: '12px', fontSize: '15px', width: '100%', height: '100%' }} />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                     {hasActiveFilters && (<button onClick={clearFilters} className="flex items-center justify-center bg-[rgba(255,69,58,0.1)] text-[#FF453A] hover:bg-[rgba(255,69,58,0.2)] transition-colors" style={{ width: '36px', height: '36px', borderRadius: '50%' }}><X size={16} strokeWidth={3} /></button>)}
+                     <button onClick={openFilterModal} className="glass-card flex items-center justify-center relative hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: hasActiveFilters ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: hasActiveFilters ? '#fff' : 'var(--text-primary)' }}><Filter size={22} fill={hasActiveFilters ? "currentColor" : "none"} />{hasActiveFilters && <div className="absolute top-[12px] right-[14px] w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--accent-blue)]"></div>}</button>
+                     <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="glass-card flex items-center justify-center hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                       {sortOrder === 'desc' ? <ArrowDown size={22} /> : <ArrowUp size={22} />}
+                     </button>
+                     <button onClick={downloadExcel} className="glass-card flex items-center justify-center hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                       <Download size={22} />
+                     </button>
+                  </div>
+                  
                   <AnimatePresence mode="popLayout">
                      {!hasActiveFilters ? (
                         <motion.div key="three-btns" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} style={{ overflow: 'hidden' }}>
@@ -1044,36 +1248,34 @@ const Dashboard = () => {
                         </motion.div>
                      )}
                   </AnimatePresence>
-               )}
-            </div>
-
-            {isMobile && (
-               <div style={{ display: 'flex', gap: '4px', padding: '6px', background: 'var(--bg-secondary)', borderRadius: '16px', border: '1px solid var(--border-color)', marginBottom: '16px', minHeight: '48px' }}>
-                  {!hasActiveFilters ? (
-                     <>
-                        <button onClick={() => setActiveModes(prev => ({ ...prev, month: !prev.month }))} style={{ flex: 1, padding: '10px 4px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', background: activeModes.month ? 'var(--bg-primary)' : 'transparent', color: activeModes.month ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.month ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.month ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախ. Ամիս</button>
-                        <button onClick={() => setActiveModes(prev => ({ ...prev, year: !prev.year }))} style={{ flex: 1, padding: '10px 4px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', background: activeModes.year ? 'var(--bg-primary)' : 'transparent', color: activeModes.year ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.year ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.year ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Նախ. Տարի</button>
-                        <button onClick={() => setActiveModes(prev => ({ ...prev, avg: !prev.avg }))} style={{ flex: 1, padding: '10px 4px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', background: activeModes.avg ? 'var(--bg-primary)' : 'transparent', color: activeModes.avg ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: activeModes.avg ? '0 4px 12px rgba(0,0,0,0.08)' : 'none', border: activeModes.avg ? '1px solid var(--border-color)' : '1px solid transparent', transition: 'all 0.2s' }}>Միջ. օրական</button>
-                     </>
-                  ) : (
-                     <>
-                        <button onClick={() => setActiveModes(prev => ({...prev, avg: false}))} style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: !activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: !activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Ընդհանուր</button>
-                        <button onClick={() => setActiveModes(prev => ({...prev, avg: true}))} style={{ flex: 1, padding: '10px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: activeModes.avg ? 'var(--accent-blue)' : 'transparent', color: activeModes.avg ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s' }}>Օրական</button>
-                     </>
-                  )}
                </div>
             )}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-               {loading && data.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary"><p>Բեռնվում են տվյալները...</p></div>) : filteredData.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary glass-card" style={{ borderRadius: '24px' }}><CheckCircle2 size={40} className="mb-4 text-green" /><p className="font-bold text-lg">Տվյալներ չեն գտնվել / Դատարկ է</p></div>) : (
-                  filteredData.map((item) => (
-                     <div key={item.id} onClick={() => fetchProductGraph(item, chartRange)} className="glass-card hover-lift cursor-pointer" style={{ padding: activeModes.avg ? '24px' : '16px 20px', borderRadius: '24px', display: 'flex', flexDirection: 'column', flex: '1 1 calc(50% - 16px)', minWidth: '320px', maxWidth: '100%' }}>                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: activeModes.avg ? '24px' : '12px' }}>
-                            <h3 style={{ fontSize: '16px', fontWeight: 'bold', lineHeight: '1.4', color: 'var(--text-primary)', flex: 1 }}>{item.name}</h3>
-                            {mixProducts.has(item.name.toLowerCase().trim()) && (
-                               <span style={{ fontSize: '10px', background: 'rgba(10, 132, 255, 0.1)', color: 'var(--accent-blue)', padding: '4px 10px', borderRadius: '8px', fontWeight: '900', whiteSpace: 'nowrap', border: '1px solid rgba(10, 132, 255, 0.2)' }}>
-                                  Միայն ակցիայի բաղադրիչ
-                               </span>
-                            )}
+               {loading && data.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary"><p>Բեռնվում են տվյալները...</p></div>) : visibleData.length === 0 ? (<div className="flex flex-col items-center justify-center w-full py-20 text-secondary glass-card" style={{ borderRadius: '24px' }}><CheckCircle2 size={40} className="mb-4 text-green" /><p className="font-bold text-lg">Տվյալներ չեն գտնվել / Դատարկ է</p></div>) : (
+                  visibleData.map((item) => (
+                     <div key={item.id} onClick={() => fetchProductGraph(item, chartRange)} className="glass-card hover-lift cursor-pointer" style={{ padding: activeModes.avg ? '24px' : '16px 20px', borderRadius: '24px', display: 'flex', flexDirection: 'column', flex: '1 1 calc(50% - 16px)', minWidth: '320px', maxWidth: '100%' }}>
+                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: activeModes.avg ? '24px' : '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                               {analyticsMode === 'categories' && !item.isPseudo && (
+                                  <Layers size={18} style={{ color: 'var(--text-secondary)' }} />
+                               )}
+                               <h3 style={{ fontSize: '16px', fontWeight: 'bold', lineHeight: '1.4', color: 'var(--text-primary)' }}>{item.name}</h3>
+                               {analyticsMode === 'categories' && !item.isPseudo && (
+                                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '6px', marginLeft: '4px' }}>
+                                     {item.matchedCount} ապրանք
+                                  </span>
+                               )}
+                            </div>
+                            
+                            {/* Tags container */}
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                               {mixProducts.has(item.name.toLowerCase().trim()) && (
+                                  <span style={{ fontSize: '10px', background: 'rgba(10, 132, 255, 0.1)', color: 'var(--accent-blue)', padding: '4px 10px', borderRadius: '8px', fontWeight: '900', whiteSpace: 'nowrap', border: '1px solid rgba(10, 132, 255, 0.2)' }}>
+                                     Միայն ակցիայի բաղադրիչ
+                                  </span>
+                               )}
+                            </div>
                          </div>
                         <div className={`flex flex-col ${activeModes.avg ? 'gap-6' : 'gap-2'}`}>
                            <div className="flex justify-between items-center bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-color)]">
