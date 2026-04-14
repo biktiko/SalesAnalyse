@@ -165,13 +165,6 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  React.useEffect(() => {
-    if (isAuthenticated) {
-      // Warm up caching without blocking the main UI thread
-      preloadCategoriesData().catch(console.error);
-    }
-  }, [isAuthenticated]);
-
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
   }

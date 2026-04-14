@@ -64,6 +64,7 @@ const Categories = () => {
   const [officialProducts, setOfficialProducts] = useState([]);
   const [mixProducts, setMixProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(false);
   
   const [activeTab, setActiveTab] = useState('categories'); // 'categories' or 'products'
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,17 +89,30 @@ const Categories = () => {
       const fetchedMix = await getPromoProducts();
       setMixProducts(fetchedMix.filter(p => p.isMix) || []);
 
-      // 3. Fetch Official Products
-      if (!globalOfficialProductsCache) {
-         await preloadCategoriesData();
+      // 3. Official Products will be loaded on demand (see useEffect below)
+      if (globalOfficialProductsCache) {
+          setOfficialProducts(globalOfficialProductsCache);
       }
-      setOfficialProducts(globalOfficialProductsCache || []);
 
     } catch (e) {
       console.error("Failed to load data for categories page:", e);
     }
     setIsLoading(false);
   };
+
+  useEffect(() => {
+    const loadProducts = async () => {
+        if ((activeTab === 'products' || isModalOpen) && !globalOfficialProductsCache) {
+            setProductsLoading(true);
+            await preloadCategoriesData();
+            setOfficialProducts(globalOfficialProductsCache || []);
+            setProductsLoading(false);
+        } else if (globalOfficialProductsCache && officialProducts.length === 0) {
+            setOfficialProducts(globalOfficialProductsCache);
+        }
+    };
+    loadProducts();
+  }, [activeTab, isModalOpen]);
 
   const allProducts = useMemo(() => {
     return [...officialProducts, ...mixProducts].sort((a,b) => a.name.localeCompare(b.name));
@@ -370,16 +384,15 @@ const Categories = () => {
                              ))}
                           </select>
                        </div>
-                    )
-                 })}
-                 {filteredProducts.length > 200 && (
-                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 'bold' }}>
-                       Ցուցադրվում է 200 ապրանք: Օգտագործեք որոնումը բոլոր էլեմենտները գտնելու համար:
-                    </div>
-                 )}
-              </div>
-           </div>
-        </div>
+                    )})}
+                  {!productsLoading && filteredProducts.length > 200 && (
+                     <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 'bold' }}>
+                        Ցուցադրվում է 200 ապրանք: Օգտագործեք որոնումը բոլոր էլեմենտները գտնելու համար:
+                     </div>
+                  )}
+               </div>
+            </div>
+         </div>
       )}
 
       {/* CREATE/EDIT MODAL */}
@@ -432,7 +445,18 @@ const Categories = () => {
                       </div>
 
                       <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', padding: '8px' }} className="custom-scrollbar">
-                         {modalFilteredProducts.slice(0, 100).map(prod => {
+                         {productsLoading ? (
+                            <div className="flex flex-col items-center justify-center h-full text-secondary py-10">
+                               <Loader2 className="animate-spin mb-4" size={24} />
+                               <p className="text-sm font-bold">Բեռնվում են ապրանքները...</p>
+                            </div>
+                         ) : modalFilteredProducts.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-secondary py-10">
+                               <Search size={32} className="mb-4 opacity-30" />
+                               <p className="text-sm font-bold">Ոչինչ չի գտնվել</p>
+                            </div>
+                         ) : (
+                            modalFilteredProducts.slice(0, 100).map(prod => {
                             const isSelected = (editingCategory.products || []).includes(prod.name);
                             const existingCatId = productToCategoryMap.get(prod.name.toLowerCase().trim());
                             const existingCatName = existingCatId && existingCatId !== editingCategory.id ? categories.find(c => c.id === existingCatId)?.name : null;
@@ -462,11 +486,17 @@ const Categories = () => {
                                      )}
                                   </div>
                                </div>
-                            )
-                         })}
-                      </div>
+                            );
+                         })
+                      )}
+                      {!productsLoading && modalFilteredProducts.length > 100 && (
+                         <div style={{ textAlign: 'center', padding: '12px', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 'bold' }}>
+                            Ցուցադրվում է 100-ը: Օգտագործեք որոնումը:
+                         </div>
+                      )}
                    </div>
                 </div>
+             </div>
 
                 {/* Modal Footer */}
                 <div style={{ padding: '20px 32px', borderTop: '1px solid var(--border-color)', background: 'var(--bg-primary)', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
