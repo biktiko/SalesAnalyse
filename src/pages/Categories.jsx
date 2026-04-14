@@ -32,7 +32,7 @@ export const preloadCategoriesData = async () => {
           const res = await fetch(`${api_url}/query`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ queryText: "SELECT product_id, TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name FROM public.vw_sales_report GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name)), product_id ORDER BY product_name ASC" })
+            body: JSON.stringify({ queryText: "SELECT product_id, TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name FROM public.vw_sales_report WHERE delivery_date >= CURRENT_DATE - INTERVAL '3 years' GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name)), product_id ORDER BY product_name ASC" })
           });
           const data = await res.json();
           if (data.rows) {
