@@ -4,60 +4,7 @@ import { Layers, Plus, Trash2, Search, X, Loader2, Edit2, Database, Tag, CheckSq
 import { getCategories, saveCategories } from '../utils/categories';
 import { getPromoProducts } from '../utils/promotions';
 
-let globalOfficialProductsCache = null;
-
-export const preloadCategoriesData = async () => {
-    // Fire off requests to get firebase caches warm
-    getCategories();
-    getPromoProducts();
-
-    if (!globalOfficialProductsCache) {
-      // Check localStorage cache first
-      const cached = localStorage.getItem('db_products_cache');
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
-            globalOfficialProductsCache = parsed.data;
-            return;
-          }
-        } catch (e) {
-          console.error("Cache parsing error", e);
-        }
-      }
-
-      const api_url = import.meta.env.VITE_API_URL;
-      if (!api_url) return;
-      try {
-          const res = await fetch(`${api_url}/query`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ queryText: "SELECT product_id, TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name FROM public.vw_sales_report WHERE delivery_date >= CURRENT_DATE - INTERVAL '3 years' GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name)), product_id ORDER BY product_name ASC" })
-          });
-          const data = await res.json();
-          if (data.rows) {
-            const map = new Map();
-            data.rows.forEach(r => {
-               const safeName = r.product_name.trim();
-               const isMixInName = safeName.toLowerCase().includes('միքս');
-               if (!isMixInName && !map.has(safeName.toLowerCase())) {
-                  map.set(safeName.toLowerCase(), { id: r.product_id, name: safeName, isMix: false });
-               }
-            });
-            const finalProds = Array.from(map.values());
-            globalOfficialProductsCache = finalProds;
-            
-            // Sync cache with Promotions logic
-            localStorage.setItem('db_products_cache', JSON.stringify({
-              timestamp: Date.now(),
-              data: finalProds
-            }));
-          }
-      } catch (e) {
-          console.error("Failed to preload official products", e);
-      }
-    }
-};
+import { getOfficialProducts, syncRecentProducts } from '../utils/products';
 
 const Categories = () => {
   const [categories, setCategories] = useState([]);
@@ -89,10 +36,8 @@ const Categories = () => {
       const fetchedMix = await getPromoProducts();
       setMixProducts(fetchedMix.filter(p => p.isMix) || []);
 
-      // 3. Official Products will be loaded on demand (see useEffect below)
-      if (globalOfficialProductsCache) {
-          setOfficialProducts(globalOfficialProductsCache);
-      }
+      const products = await getOfficialProducts();
+      setOfficialProducts(products);
 
     } catch (e) {
       console.error("Failed to load data for categories page:", e);
@@ -102,28 +47,36 @@ const Categories = () => {
 
   useEffect(() => {
     const loadProducts = async () => {
-        if ((activeTab === 'products' || isModalOpen) && !globalOfficialProductsCache) {
-            setProductsLoading(true);
-            await preloadCategoriesData();
-            setOfficialProducts(globalOfficialProductsCache || []);
-            setProductsLoading(false);
-        } else if (globalOfficialProductsCache && officialProducts.length === 0) {
-            setOfficialProducts(globalOfficialProductsCache);
+        if (activeTab === 'products' || isModalOpen) {
+            if (officialProducts.length === 0) {
+              setProductsLoading(true);
+              const products = await getOfficialProducts();
+              setOfficialProducts(products || []);
+              setProductsLoading(false);
+            }
+            
+            // Smart sync: check for new products in the background
+            const hasNewProducts = await syncRecentProducts();
+            if (hasNewProducts) {
+               const refreshed = await getOfficialProducts();
+               setOfficialProducts([...refreshed]); // Force reference update
+            }
         }
     };
     loadProducts();
-  }, [activeTab, isModalOpen]);
+  }, [activeTab, isModalOpen, officialProducts.length]);
 
   const allProducts = useMemo(() => {
     return [...officialProducts, ...mixProducts].sort((a,b) => a.name.localeCompare(b.name));
   }, [officialProducts, mixProducts]);
 
+  const normalizeProductName = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/\.$/, '');
+
   const productToCategoryMap = useMemo(() => {
     const map = new Map();
-    const normalize = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/\.$/, '');
     categories.forEach(cat => {
       if (cat.products && Array.isArray(cat.products)) {
-        cat.products.forEach(pName => map.set(normalize(pName), cat.id));
+        cat.products.forEach(pName => map.set(normalizeProductName(pName), cat.id));
       }
     });
     return map;
@@ -204,12 +157,10 @@ const Categories = () => {
 
   const filteredProducts = useMemo(() => {
     let list = [...allProducts];
-    const normalize = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/\.$/, '');
-
     // Sort: Unassigned first, then Alphabetical
     list.sort((a, b) => {
-      const aAssigned = productToCategoryMap.has(normalize(a.name));
-      const bAssigned = productToCategoryMap.has(normalize(b.name));
+      const aAssigned = productToCategoryMap.has(normalizeProductName(a.name));
+      const bAssigned = productToCategoryMap.has(normalizeProductName(b.name));
       if (aAssigned !== bAssigned) return aAssigned ? 1 : -1;
       return a.name.localeCompare(b.name);
     });
@@ -223,13 +174,11 @@ const Categories = () => {
 
   const modalFilteredProducts = useMemo(() => {
     let list = [...allProducts];
-    const normalize = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/\.$/, '');
-
     list.sort((a, b) => {
       // Products not in ANY category should come first
       // Note: we check if they are in the map
-      const aAssigned = productToCategoryMap.has(normalize(a.name));
-      const bAssigned = productToCategoryMap.has(normalize(b.name));
+      const aAssigned = productToCategoryMap.has(normalizeProductName(a.name));
+      const bAssigned = productToCategoryMap.has(normalizeProductName(b.name));
       
       if (aAssigned !== bAssigned) {
         return aAssigned ? 1 : -1;
@@ -360,7 +309,7 @@ const Categories = () => {
            <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }} className="custom-scrollbar">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                  {filteredProducts.slice(0, 200).map(prod => {
-                    const currentCatId = productToCategoryMap.get(prod.name.toLowerCase().trim()) || "";
+                    const currentCatId = productToCategoryMap.get(normalizeProductName(prod.name)) || "";
                     return (
                        <div key={prod.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'var(--bg-primary)', borderRadius: '16px', border: '1px solid var(--border-color)', gap: '16px', flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '250px' }}>
@@ -458,7 +407,7 @@ const Categories = () => {
                          ) : (
                             modalFilteredProducts.slice(0, 100).map(prod => {
                             const isSelected = (editingCategory.products || []).includes(prod.name);
-                            const existingCatId = productToCategoryMap.get(prod.name.toLowerCase().trim());
+                            const existingCatId = productToCategoryMap.get(normalizeProductName(prod.name));
                             const existingCatName = existingCatId && existingCatId !== editingCategory.id ? categories.find(c => c.id === existingCatId)?.name : null;
 
                             return (
@@ -482,7 +431,7 @@ const Categories = () => {
                                         <span style={{ fontSize: '10px', color: 'var(--accent-orange)' }}>Արդեն պատկանում է «{existingCatName}»-ին (կփոխարինվի)</span>
                                      )}
                                      {prod.isMix && (
-                                        <span style={{ fontSize: '10px', color: 'var(--accent-green)' }}>Ակցիոն բաղադրիչ</span>
+                                        <span style={{ fontSize: '10px', color: 'var(--accent-green)' }}>Միայն ակցիայի բաղադրիչ</span>
                                      )}
                                   </div>
                                </div>

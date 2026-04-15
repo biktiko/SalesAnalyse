@@ -233,32 +233,88 @@ const Dashboard = () => {
     let query = ``;
     if (appliedFilters.periodAStart && appliedFilters.periodAEnd) {
        const hasB = appliedFilters.periodBStart && appliedFilters.periodBEnd;
-       query = `
-          SELECT 
-              MIN(product_id) as product_id, 
-              TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, 
-              COALESCE(SUM(CASE WHEN delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}' THEN sold_count ELSE 0 END), 0) as current_month,
-              ${hasB ? `COALESCE(SUM(CASE WHEN delivery_date >= '${appliedFilters.periodBStart}' AND delivery_date <= '${appliedFilters.periodBEnd}' THEN sold_count ELSE 0 END), 0)` : '0'} as previous_month,
-              0 as previous_year
-          FROM public.vw_sales_report
-          WHERE ((delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}')
-             ${hasB ? `OR (delivery_date >= '${appliedFilters.periodBStart}' AND delivery_date <= '${appliedFilters.periodBEnd}')` : ''})
-          AND product_name != 'Պարտքերի զրոյացում'
-          GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
-       `;
+       if (hasB) {
+           query = `
+             SELECT 
+                 MIN(product_id) as product_id, 
+                 product_name, 
+                 COALESCE(SUM(current_month), 0) as current_month,
+                 COALESCE(SUM(previous_month), 0) as previous_month,
+                 0 as previous_year
+             FROM (
+                 SELECT 
+                     MIN(product_id) as product_id, 
+                     TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, 
+                     SUM(sold_count) as current_month,
+                     0 as previous_month
+                 FROM public.vw_sales_report
+                 WHERE delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}'
+                   AND product_name != 'Պարտքերի զրոյացում'
+                 GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
+                 
+                 UNION ALL
+                 
+                 SELECT 
+                     MIN(product_id) as product_id, 
+                     TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, 
+                     0 as current_month,
+                     SUM(sold_count) as previous_month
+                 FROM public.vw_sales_report
+                 WHERE delivery_date >= '${appliedFilters.periodBStart}' AND delivery_date <= '${appliedFilters.periodBEnd}'
+                   AND product_name != 'Պարտքերի զրոյացում'
+                 GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
+             ) as sub
+             GROUP BY product_name
+           `;
+       } else {
+           query = `
+             SELECT 
+                 MIN(product_id) as product_id, 
+                 TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, 
+                 COALESCE(SUM(sold_count), 0) as current_month,
+                 0 as previous_month,
+                 0 as previous_year
+             FROM public.vw_sales_report
+             WHERE delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}'
+               AND product_name != 'Պարտքերի զրոյացում'
+             GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
+           `;
+       }
     } else {
        query = `
           SELECT 
               MIN(product_id) as product_id, 
-              TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, 
-              COALESCE(SUM(CASE WHEN delivery_date >= CURRENT_DATE - INTERVAL '30 days' THEN sold_count ELSE 0 END), 0) as current_month,
-              COALESCE(SUM(CASE WHEN delivery_date >= CURRENT_DATE - INTERVAL '60 days' AND delivery_date < CURRENT_DATE - INTERVAL '30 days' THEN sold_count ELSE 0 END), 0) as previous_month,
-              COALESCE(SUM(CASE WHEN delivery_date >= (CURRENT_DATE - INTERVAL '1 year' - INTERVAL '30 days') AND delivery_date < CURRENT_DATE - INTERVAL '1 year' THEN sold_count ELSE 0 END), 0) as previous_year
-          FROM public.vw_sales_report
-          WHERE ((delivery_date >= CURRENT_DATE - INTERVAL '60 days') 
-             OR (delivery_date >= CURRENT_DATE - INTERVAL '1 year' - INTERVAL '30 days' AND delivery_date < CURRENT_DATE - INTERVAL '1 year'))
-          AND product_name != 'Պարտքերի զրոյացում'
-          GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
+              product_name, 
+              COALESCE(SUM(current_month), 0) as current_month,
+              COALESCE(SUM(previous_month), 0) as previous_month,
+              COALESCE(SUM(previous_year), 0) as previous_year
+          FROM (
+              SELECT 
+                  MIN(product_id) as product_id, 
+                  TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, 
+                  SUM(CASE WHEN delivery_date >= CURRENT_DATE - INTERVAL '30 days' THEN sold_count ELSE 0 END) as current_month,
+                  SUM(CASE WHEN delivery_date >= CURRENT_DATE - INTERVAL '60 days' AND delivery_date < CURRENT_DATE - INTERVAL '30 days' THEN sold_count ELSE 0 END) as previous_month,
+                  0 as previous_year
+              FROM public.vw_sales_report
+              WHERE delivery_date >= CURRENT_DATE - INTERVAL '60 days'
+                AND product_name != 'Պարտքերի զրոյացում'
+              GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
+              
+              UNION ALL
+              
+              SELECT 
+                  MIN(product_id) as product_id, 
+                  TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, 
+                  0 as current_month,
+                  0 as previous_month,
+                  SUM(sold_count) as previous_year
+              FROM public.vw_sales_report
+              WHERE delivery_date >= (CURRENT_DATE - INTERVAL '1 year' - INTERVAL '30 days') 
+                AND delivery_date < CURRENT_DATE - INTERVAL '1 year'
+                AND product_name != 'Պարտքերի զրոյացում'
+              GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
+          ) as sub
+          GROUP BY product_name
        `;
     }
 
@@ -682,19 +738,24 @@ const Dashboard = () => {
         });
     });
 
-    const uniqueBaseNames = [...new Set(baseDbNames.map(b => `'${b.dbName.replace(/'/g, "''")}'`))].join(', ');
-    const uniquePromoNames = [...new Set(allRelevantPromoDbNames.map(n => `'${n.replace(/'/g, "''")}'`))].join(', ');
-
+    // Use LIKE with % to perfectly capture trailing spaces and dots while still using pure index scans.
     const whereClauseParts = [];
-    if (uniqueBaseNames) whereClauseParts.push(`TRIM(TRAILING '.' FROM TRIM(product_name)) IN (${uniqueBaseNames})`);
-    if (uniquePromoNames) whereClauseParts.push(`TRIM(TRAILING '.' FROM TRIM(product_name)) IN (${uniquePromoNames})`);
+    
+    [...new Set(baseDbNames.map(b => b.dbName))].forEach(name => {
+        whereClauseParts.push(`product_name LIKE '${name.replace(/'/g, "''")}%'`);
+    });
+    
+    [...new Set(allRelevantPromoDbNames)].forEach(name => {
+        whereClauseParts.push(`product_name LIKE '${name.replace(/'/g, "''")}%'`);
+    });
+
     const whereClause = `(${whereClauseParts.join(' OR ')})`;
 
     const query = `
-      SELECT TO_CHAR(delivery_date, 'YYYY-MM-DD') as date_str, TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name, SUM(sold_count) as total
+      SELECT TO_CHAR(delivery_date, 'YYYY-MM-DD') as date_str, product_name, SUM(sold_count) as total
       FROM public.vw_sales_report
       WHERE ${whereClause} AND ${dateFilter}
-      GROUP BY TO_CHAR(delivery_date, 'YYYY-MM-DD'), TRIM(TRAILING '.' FROM TRIM(product_name))
+      GROUP BY TO_CHAR(delivery_date, 'YYYY-MM-DD'), product_name
       ORDER BY date_str ASC
     `;
     try {
@@ -1270,7 +1331,7 @@ const Dashboard = () => {
                             
                             {/* Tags container */}
                             <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                               {mixProducts.has(item.name.toLowerCase().trim()) && (
+                               {(analyticsMode === 'products' || item.isPseudo) && mixProducts.has(item.name.toLowerCase().trim()) && (
                                   <span style={{ fontSize: '10px', background: 'rgba(10, 132, 255, 0.1)', color: 'var(--accent-blue)', padding: '4px 10px', borderRadius: '8px', fontWeight: '900', whiteSpace: 'nowrap', border: '1px solid rgba(10, 132, 255, 0.2)' }}>
                                      Միայն ակցիայի բաղադրիչ
                                   </span>

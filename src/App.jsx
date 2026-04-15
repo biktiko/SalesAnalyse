@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { LineChart, Percent, Settings as SettingsIcon, Tag, Menu, X, Users as UsersIcon, Database, Layers } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Promotions from './pages/Promotions';
-import Categories, { preloadCategoriesData } from './pages/Categories';
+import Categories from './pages/Categories';
 import Users from './pages/Users';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
@@ -164,6 +164,14 @@ function App() {
 
     return () => clearInterval(interval);
   }, []);
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      import('./utils/products.js').then(({ seedInitialProducts }) => {
+        seedInitialProducts().catch(console.error);
+      });
+    }
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;

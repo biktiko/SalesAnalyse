@@ -5,6 +5,7 @@ import {
   Database, Tag, Filter, Check, ChevronRight, Hash, Layers, ArrowUp
 } from 'lucide-react';
 import { getPromotions, savePromotions, getPromoProducts, savePromoProducts } from '../utils/promotions';
+import { getOfficialProducts, syncRecentProducts } from '../utils/products';
 
 const formatDate = (dateString) => {
   if (!dateString) return '';
@@ -128,40 +129,16 @@ const Promotions = () => {
   };
 
   // --- Product Functions ---
-  const fetchDbProducts = async (force = false) => {
-    const cached = localStorage.getItem('db_products_cache');
-    if (!force && cached) {
-      const parsed = JSON.parse(cached);
-      if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
-        setDbProducts(parsed.data);
-        return;
-      }
-    }
-
+  const fetchDbProducts = async () => {
     setIsDbLoading(true);
     try {
-      const api_url = import.meta.env.VITE_API_URL;
-      const res = await fetch(`${api_url}/query`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queryText: "SELECT product_id, TRIM(TRAILING '.' FROM TRIM(MAX(product_name))) as product_name FROM public.vw_sales_report WHERE delivery_date >= CURRENT_DATE - INTERVAL '3 years' GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name)), product_id ORDER BY product_name ASC" })
-      });
-      const data = await res.json();
-      if (data.rows) {
-        const map = new Map();
-        data.rows.forEach(r => {
-           const safeName = r.product_name.trim();
-           const isMixInName = safeName.toLowerCase().includes('միքս');
-           if (!isMixInName && !map.has(safeName.toLowerCase())) {
-              map.set(safeName.toLowerCase(), { id: r.product_id, name: safeName, isMix: false });
-           }
-        });
-        const finalProds = Array.from(map.values());
-        setDbProducts(finalProds);
-        localStorage.setItem('db_products_cache', JSON.stringify({
-          timestamp: Date.now(),
-          data: finalProds
-        }));
+      const products = await getOfficialProducts();
+      setDbProducts(products || []);
+      
+      const hasNewProducts = await syncRecentProducts();
+      if (hasNewProducts) {
+          const refreshed = await getOfficialProducts();
+          setDbProducts([...refreshed]);
       }
     } catch (e) {
       console.error("Failed to fetch products:", e);
