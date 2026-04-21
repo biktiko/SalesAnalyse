@@ -109,7 +109,7 @@ const Settings = ({ onLogout, user }) => {
         </div>
 
         <div style={{ textAlign: 'center', marginTop: '16px' }}>
-           <p style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.5, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>Martin Star Analytics v1.0.0 (Beta)</p>
+           <p style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.5, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>«Martin Star» Sales Analytics v1.3.0</p>
         </div>
       </div>
     </motion.div>

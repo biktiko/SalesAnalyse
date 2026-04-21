@@ -59,6 +59,9 @@ const getFilterCacheKey = (filtersObj) => {
    return key;
 };
 
+const normalizeProductName = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/\.$/, '');
+
+
 const getCachedData = (keySuffix = "default") => {
    try {
       const data = localStorage.getItem(`${CACHE_KEY}_${keySuffix}`);
@@ -176,7 +179,7 @@ const Dashboard = () => {
     const loadExtraData = async () => {
       try {
         const prods = await getPromoProducts();
-        const mixNames = new Set(prods.filter(p => p.isMix).map(p => p.name.toLowerCase().trim()));
+        const mixNames = new Set(prods.filter(p => p.isMix).map(p => normalizeProductName(p.name)));
         setMixProducts(mixNames);
 
         const cats = await getCategories();
@@ -340,12 +343,12 @@ const Dashboard = () => {
          daysB = getDaysBetween(appliedFilters.periodBStart, appliedFilters.periodBEnd);
       }
 
-      // --- Promotions Unpacking Logic ---
       const activePromos = await getPromotions();
       const productMap = new Map();
 
       resData.rows.forEach(r => {
-         const promo = activePromos.find(p => p.name.toLowerCase() === r.product_name.toLowerCase());
+         const sqlName = normalizeProductName(r.product_name);
+         const promo = activePromos.find(p => normalizeProductName(p.name) === sqlName);
          if (promo) {
             const multiplierCM = Number(r.current_month || 0);
             const multiplierPM = Number(r.previous_month || 0);
@@ -354,7 +357,7 @@ const Dashboard = () => {
             promo.products.forEach(prod => {
                const rawName = prod.productName || 'Անհայտ';
                const safeName = rawName.trim().replace(/\.$/, '');
-               const mapKey = safeName.toLowerCase();
+               const mapKey = normalizeProductName(rawName);
                const qty = Number(prod.quantity || 1);
 
                const existing = productMap.get(mapKey) || { product_id: String(prod.productId), product_name: safeName, current_month: 0, previous_month: 0, previous_year: 0 };
@@ -365,7 +368,7 @@ const Dashboard = () => {
             });
          } else {
             const safeName = r.product_name.trim().replace(/\.$/, '');
-            const mapKey = safeName.toLowerCase();
+            const mapKey = normalizeProductName(r.product_name);
             const existing = productMap.get(mapKey) || { product_id: String(r.product_id), product_name: safeName, current_month: 0, previous_month: 0, previous_year: 0 };
             existing.current_month += Number(r.current_month || 0);
             existing.previous_month += Number(r.previous_month || 0);
@@ -449,24 +452,23 @@ const Dashboard = () => {
 
   const groupedData = useMemo(() => {
      const prodToCat = new Map();
-     const normalize = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/\.$/, '');
 
      categories.forEach(c => {
          if (c.products && Array.isArray(c.products)) {
-             c.products.forEach(p => prodToCat.set(normalize(p), c));
+             c.products.forEach(p => prodToCat.set(normalizeProductName(p), c));
          }
      });
 
      if (analyticsMode === 'products') {
        return data.map(item => ({
             ...item,
-            isAssigned: prodToCat.has(normalize(item.name))
+            isAssigned: prodToCat.has(normalizeProductName(item.name))
        }));
      }
      
      const catMap = new Map();
      data.forEach(item => {
-         const safeName = normalize(item.name);
+         const safeName = normalizeProductName(item.name);
          const cat = prodToCat.get(safeName);
          
          const targetId = cat ? cat.id : `pseudo_${item.id}`;
@@ -1331,7 +1333,7 @@ const Dashboard = () => {
                             
                             {/* Tags container */}
                             <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                               {(analyticsMode === 'products' || item.isPseudo) && mixProducts.has(item.name.toLowerCase().trim()) && (
+                               {(analyticsMode === 'products' || item.isPseudo) && mixProducts.has(normalizeProductName(item.name)) && (
                                   <span style={{ fontSize: '10px', background: 'rgba(10, 132, 255, 0.1)', color: 'var(--accent-blue)', padding: '4px 10px', borderRadius: '8px', fontWeight: '900', whiteSpace: 'nowrap', border: '1px solid rgba(10, 132, 255, 0.2)' }}>
                                      Միայն ակցիայի բաղադրիչ
                                   </span>
