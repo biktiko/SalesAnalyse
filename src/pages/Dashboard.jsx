@@ -697,6 +697,39 @@ const Dashboard = () => {
      } catch (e) {}
   };
 
+  const deriveSubsetGraph = (id, targetRange) => {
+     if (targetRange === 'custom') return null;
+     const ranges = ['1year', '180days', '90days', '30days'];
+     const targetIdx = ranges.indexOf(targetRange);
+     if (targetIdx === -1) return null;
+     
+     for (let i = 0; i < targetIdx; i++) {
+        const largerRange = ranges[i];
+        const cached = getCachedGraph(id, largerRange);
+        if (cached && cached.rawData && cached.rawData.length > 0) {
+            const daysMapping = { '30days': 30, '90days': 90, '180days': 180, '1year': 365 };
+            const neededDays = daysMapping[targetRange];
+            
+            const d = new Date();
+            d.setDate(d.getDate() - neededDays);
+            const cutoffStr = d.toISOString().split('T')[0];
+            
+            const rawData = cached.rawData.filter(r => r.date >= cutoffStr);
+            const citiesMap = {};
+            rawData.forEach(r => {
+                if (!citiesMap[r.city]) citiesMap[r.city] = 0;
+                citiesMap[r.city] += r.total;
+            });
+            const cityData = Object.keys(citiesMap).map(city => ({ name: city, value: citiesMap[city] })).sort((a,b) => b.value - a.value);
+            
+            const derivedData = { rawData, cityData };
+            setCachedGraph(id, targetRange, derivedData);
+            return derivedData;
+        }
+     }
+     return null;
+  };
+
   const fetchProductGraph = async (product, range, forceStart = '', forceEnd = '') => {
     setSelectedProduct(product);
     setSelectedGraphCities([...filters.cities]); // Initialize with global city filters
@@ -704,12 +737,20 @@ const Dashboard = () => {
     const sDate = forceStart || (graphRange.startDate ? format(graphRange.startDate, 'yyyy-MM-dd') : '');
     const eDate = forceEnd || (graphRange.endDate ? format(graphRange.endDate, 'yyyy-MM-dd') : '');
     
-    // Check if graph already cached
+    // Check if exactly cached
     const cachedPlot = getCachedGraph(product.id, range, sDate, eDate);
     if (cachedPlot) {
        setModalData(cachedPlot);
        setModalLoading(false);
-       return; // Do not refetch graph. It changes rarely during same session.
+       return;
+    }
+
+    // Attempt to derive from larger date-range cache dynamically subsetting the array!
+    const subsetPlot = deriveSubsetGraph(product.id, range);
+    if (subsetPlot) {
+       setModalData(subsetPlot);
+       setModalLoading(false);
+       return;
     }
 
     setModalLoading(true);
@@ -1130,7 +1171,7 @@ const Dashboard = () => {
                         {availableCities.length > 0 && (
                            <div>
                               <label style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: isMobile ? '8px' : '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                 <Database size={18} className="text-blue" />Մասնաճյուղ/Քաղաք
+                                 <Database size={18} className="text-blue" />Քաղաք
                               </label>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                  {availableCities.map(city => {
@@ -1207,7 +1248,7 @@ const Dashboard = () => {
                         {/* Period B Select */}
                         <div style={{ paddingTop: isMobile ? '12px' : '20px', borderTop: '1px dashed var(--border-color)' }}>
                            <label style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: isMobile ? '8px' : '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Calendar size={18} style={{ color: 'var(--accent-orange)' }} />Ժամանակահատված 2 (համեմատության համար)
+                              <Calendar size={18} style={{ color: 'var(--accent-orange)' }} />Ժամանակահատված 2
                            </label>
 
                            <div 
@@ -1330,12 +1371,12 @@ const Dashboard = () => {
                         <Search size={18} className="text-secondary" />
                         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Որոնել..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', marginLeft: '10px', fontSize: '14px', width: '100%', height: '100%' }} />
                      </div>
-                     <button onClick={downloadExcel} className="glass-card flex items-center justify-center relative hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                        <Download size={20} />
-                     </button>
                      <button onClick={openFilterModal} className="glass-card flex items-center justify-center relative hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: hasActiveFilters ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: hasActiveFilters ? '#fff' : 'var(--text-primary)' }}><Filter size={20} fill={hasActiveFilters ? "currentColor" : "none"} />{hasActiveFilters && <div className="absolute top-[10px] right-[10px] w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--accent-blue)]"></div>}</button>
                      <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="glass-card flex items-center justify-center hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
                        {sortOrder === 'desc' ? <ArrowDown size={20} /> : <ArrowUp size={20} />}
+                     </button>
+                     <button onClick={downloadExcel} className="glass-card flex items-center justify-center relative hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                        <Download size={20} />
                      </button>
                   </div>
                </div>
