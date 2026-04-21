@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Loader2, Search, CheckCircle2, X, Calendar, Filter, ArrowUp, ArrowDown, Download, Layers } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Loader2, Search, CheckCircle2, X, Calendar, Filter, ArrowUp, ArrowDown, Download, Layers, Database } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getPromotions, getPromoProducts } from '../utils/promotions';
@@ -56,6 +56,9 @@ const getFilterCacheKey = (filtersObj) => {
          key += `_vs_${filtersObj.periodBStart}_${filtersObj.periodBEnd}`;
       }
    }
+   if (filtersObj.cities && filtersObj.cities.length > 0) {
+      key += `_cities_${filtersObj.cities.sort().join('-')}`;
+   }
    return key;
 };
 
@@ -101,10 +104,14 @@ const Dashboard = () => {
     diffPercentMin: '',
     diffPercentMax: '',
     diffNumericMin: '',
-    diffNumericMax: ''
+    diffNumericMax: '',
+    cities: []
   });
   const [draftFilters, setDraftFilters] = useState(filters);
   const [mixProducts, setMixProducts] = useState(new Set());
+  const [availableCities] = useState([
+    'Երևան', 'Գյումրի', 'Վանաձոր', 'Եղեգնաձոր', 'Իջևան', 'Սևան', 'Գորիս', 'Կապան'
+  ]);
   const [showRangeA, setShowRangeA] = useState(false);
   const [showRangeB, setShowRangeB] = useState(false);
   const hasActiveFilters = filters.periodAStart !== '' || 
@@ -123,7 +130,7 @@ const Dashboard = () => {
   };
 
   const clearFilters = () => {
-     const empty = { periodAStart: '', periodAEnd: '', periodBStart: '', periodBEnd: '', diffPercentMin: '', diffPercentMax: '', diffNumericMin: '', diffNumericMax: '' };
+     const empty = { periodAStart: '', periodAEnd: '', periodBStart: '', periodBEnd: '', diffPercentMin: '', diffPercentMax: '', diffNumericMin: '', diffNumericMax: '', cities: [] };
      setFilters(empty);
      setDraftFilters(empty);
      setIsFilterModalOpen(false);
@@ -203,6 +210,7 @@ const Dashboard = () => {
      key: 'selection'
   });
   const [showGraphDatePicker, setShowGraphDatePicker] = useState(false);
+  const [selectedGraphCities, setSelectedGraphCities] = useState([]);
 
   const startProgressBar = () => {
     setProgress(15);
@@ -234,6 +242,10 @@ const Dashboard = () => {
     const pInterval = startProgressBar();
 
     let query = ``;
+    const cityFilterStr = appliedFilters.cities && appliedFilters.cities.length > 0 
+        ? ` AND stock_group_name IN (${appliedFilters.cities.map(c => `'${c}'`).join(', ')}) `
+        : ``;
+
     if (appliedFilters.periodAStart && appliedFilters.periodAEnd) {
        const hasB = appliedFilters.periodBStart && appliedFilters.periodBEnd;
        if (hasB) {
@@ -252,7 +264,7 @@ const Dashboard = () => {
                      0 as previous_month
                  FROM public.vw_sales_report
                  WHERE delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}'
-                   AND product_name != 'Պարտքերի զրոյացում'
+                   AND product_name != 'Պարտքերի զրոյացում' ${cityFilterStr}
                  GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
                  
                  UNION ALL
@@ -264,7 +276,7 @@ const Dashboard = () => {
                      SUM(sold_count) as previous_month
                  FROM public.vw_sales_report
                  WHERE delivery_date >= '${appliedFilters.periodBStart}' AND delivery_date <= '${appliedFilters.periodBEnd}'
-                   AND product_name != 'Պարտքերի զրոյացում'
+                   AND product_name != 'Պարտքերի զրոյացում' ${cityFilterStr}
                  GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
              ) as sub
              GROUP BY product_name
@@ -279,7 +291,7 @@ const Dashboard = () => {
                  0 as previous_year
              FROM public.vw_sales_report
              WHERE delivery_date >= '${appliedFilters.periodAStart}' AND delivery_date <= '${appliedFilters.periodAEnd}'
-               AND product_name != 'Պարտքերի զրոյացում'
+               AND product_name != 'Պարտքերի զրոյացում' ${cityFilterStr}
              GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
            `;
        }
@@ -300,7 +312,7 @@ const Dashboard = () => {
                   0 as previous_year
               FROM public.vw_sales_report
               WHERE delivery_date >= CURRENT_DATE - INTERVAL '60 days'
-                AND product_name != 'Պարտքերի զրոյացում'
+                AND product_name != 'Պարտքերի զրոյացում' ${cityFilterStr}
               GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
               
               UNION ALL
@@ -314,7 +326,7 @@ const Dashboard = () => {
               FROM public.vw_sales_report
               WHERE delivery_date >= (CURRENT_DATE - INTERVAL '1 year' - INTERVAL '30 days') 
                 AND delivery_date < CURRENT_DATE - INTERVAL '1 year'
-                AND product_name != 'Պարտքերի զրոյացում'
+                AND product_name != 'Պարտքերի զրոյացում' ${cityFilterStr}
               GROUP BY TRIM(TRAILING '.' FROM TRIM(product_name))
           ) as sub
           GROUP BY product_name
@@ -687,6 +699,7 @@ const Dashboard = () => {
 
   const fetchProductGraph = async (product, range, forceStart = '', forceEnd = '') => {
     setSelectedProduct(product);
+    setSelectedGraphCities([...filters.cities]); // Initialize with global city filters
     
     const sDate = forceStart || (graphRange.startDate ? format(graphRange.startDate, 'yyyy-MM-dd') : '');
     const eDate = forceEnd || (graphRange.endDate ? format(graphRange.endDate, 'yyyy-MM-dd') : '');
@@ -754,10 +767,10 @@ const Dashboard = () => {
     const whereClause = `(${whereClauseParts.join(' OR ')})`;
 
     const query = `
-      SELECT TO_CHAR(delivery_date, 'YYYY-MM-DD') as date_str, product_name, SUM(sold_count) as total
+      SELECT TO_CHAR(delivery_date, 'YYYY-MM-DD') as date_str, product_name, stock_group_name, SUM(sold_count) as total
       FROM public.vw_sales_report
       WHERE ${whereClause} AND ${dateFilter}
-      GROUP BY TO_CHAR(delivery_date, 'YYYY-MM-DD'), product_name
+      GROUP BY TO_CHAR(delivery_date, 'YYYY-MM-DD'), product_name, stock_group_name
       ORDER BY date_str ASC
     `;
     try {
@@ -770,10 +783,14 @@ const Dashboard = () => {
       const resData = await response.json();
       if (!response.ok || resData.error) throw new Error(resData.message || resData.error);
       
-      let datesMap = {};
+      let datesMap = {}; // Will now store aggregates per date+city implicitly or we just push to an array
+      let rawAggMap = {}; // { [date_city]: { date, city, total } }
+      let citiesMap = {};
+      
       resData.rows.forEach(r => {
          let sold = Number(r.total);
          let pName = (r.product_name || '').trim().replace(/\.$/, '');
+         let city = r.stock_group_name || 'Անհայտ';
          
          const isPromo = prodMultipliers.has(pName);
          if (isPromo) {
@@ -782,17 +799,26 @@ const Dashboard = () => {
              return; // Safely ignore this row to prevent pollution if something weird passes
          }
 
-         if (!datesMap[r.date_str]) datesMap[r.date_str] = 0;
-         datesMap[r.date_str] += sold;
+         const key = `${r.date_str}_${city}`;
+         if (!rawAggMap[key]) {
+             rawAggMap[key] = { date: r.date_str, city: city, total: 0 };
+         }
+         rawAggMap[key].total += sold;
+         
+         if (!citiesMap[city]) citiesMap[city] = 0;
+         citiesMap[city] += sold;
       });
 
-      let rawData = Object.keys(datesMap).sort().map(date => ({ date, total: datesMap[date] }));
-      setModalData(rawData);
-      setCachedGraph(product.id, range, rawData, sDate, eDate);
+      let rawData = Object.values(rawAggMap);
+      let cityData = Object.keys(citiesMap).map(city => ({ name: city, value: citiesMap[city] })).sort((a,b) => b.value - a.value);
+      
+      const completeData = { rawData, cityData };
+      setModalData(completeData);
+      setCachedGraph(product.id, range, completeData, sDate, eDate);
       finishProgressBar(pInterval);
     } catch (err) {
       console.error("Modal Fetch Error:", err);
-      setModalData([]);
+      setModalData(null);
       clearInterval(pInterval);
       setProgress(0);
     } finally {
@@ -801,10 +827,26 @@ const Dashboard = () => {
   };
 
   const processChartData = () => {
-    if (!modalData || modalData.length === 0) return [];
-    if (chartGroup === 'day') return modalData;
+    if (!modalData || !modalData.rawData || modalData.rawData.length === 0) return [];
+    
+    // Filter by selected individual cities in graph, or show all if nothing selected
+    const filteredRaw = modalData.rawData.filter(item => {
+        if (selectedGraphCities.length === 0) return true;
+        return selectedGraphCities.includes(item.city);
+    });
+    
+    const aggregatedByDate = {};
+    filteredRaw.forEach(item => {
+       if (!aggregatedByDate[item.date]) aggregatedByDate[item.date] = 0;
+       aggregatedByDate[item.date] += item.total;
+    });
+
+    const flatDates = Object.keys(aggregatedByDate).sort().map(d => ({ date: d, total: aggregatedByDate[d] }));
+
+    if (chartGroup === 'day') return flatDates;
+    
     const grouped = {};
-    modalData.forEach(item => {
+    flatDates.forEach(item => {
       const d = new Date(item.date);
       let key = item.date;
       if (chartGroup === 'week') {
@@ -1084,6 +1126,41 @@ const Dashboard = () => {
                      {/* Content Area (Scrollable) */}
                      <div style={{ padding: isMobile ? '12px 16px' : '20px 28px', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '20px', flex: '1 1 auto', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', background: 'var(--bg-primary)' }}>
                         
+                        {/* Cities Filter */}
+                        {availableCities.length > 0 && (
+                           <div>
+                              <label style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: isMobile ? '8px' : '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                 <Database size={18} className="text-blue" />Մասնաճյուղ/Քաղաք
+                              </label>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                 {availableCities.map(city => {
+                                    const isSelected = draftFilters.cities && draftFilters.cities.includes(city);
+                                    return (
+                                       <button 
+                                          key={city}
+                                          onClick={() => {
+                                             const newCities = isSelected 
+                                                ? (draftFilters.cities || []).filter(c => c !== city)
+                                                : [...(draftFilters.cities || []), city];
+                                             setDraftFilters({...draftFilters, cities: newCities});
+                                          }}
+                                          style={{
+                                             padding: '6px 14px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', border: '1px solid',
+                                             background: isSelected ? 'var(--text-primary)' : 'var(--bg-secondary)',
+                                             borderColor: isSelected ? 'var(--text-primary)' : 'var(--border-color)',
+                                             color: isSelected ? 'var(--bg-primary)' : 'var(--text-primary)',
+                                             transition: 'all 0.2s', cursor: 'pointer'
+                                          }}
+                                       >
+                                          {city}
+                                       </button>
+                                    );
+                                 })}
+                              </div>
+                           </div>
+                        )}
+                        <hr style={{ borderTop: '1px dashed var(--border-color)', borderBottom: 'none', margin: isMobile ? '0' : '0' }}/>
+
                         {/* Period A Select */}
                         <div>
                            <label style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: isMobile ? '8px' : '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1488,8 +1565,55 @@ const Dashboard = () => {
                        </div>
                     </div>
                     <div style={{ padding: isMobile ? '10px' : '20px', flex: 1, minHeight: isMobile ? '280px' : '350px', overflowY: 'auto' }}>
-                       {modalLoading ? (<div className="flex flex-col items-center justify-center h-full py-12 text-secondary"><Loader2 size={32} className="animate-spin mb-4 text-blue" /><p style={{fontSize: '13px'}}>Ստացվում են տվյալները...</p></div>) : chartProcessedData.length === 0 ? (<div className="flex flex-col items-center justify-center h-full py-12 text-secondary"><AlertTriangle size={36} className="mb-4 text-orange-500" /><p className="font-bold text-lg">Վաճառքներ չկան</p></div>) : (
-                          <div style={{ width: '100%', height: isMobile ? '250px' : '300px' }}><ResponsiveContainer width="100%" height="100%"><BarChart data={chartProcessedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" /><XAxis dataKey="date" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} tickMargin={10} axisLine={false} tickLine={false} tickFormatter={(val) => isMobile && chartProcessedData.length > 15 ? '' : val} /><YAxis tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(val) => val >= 1000 ? (val/1000).toFixed(1)+'k' : val} /><Tooltip cursor={{ fill: 'rgba(10, 132, 255, 0.05)' }} contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }} formatter={(value) => [formatNum(value) + ' հատ', 'Վաճառք']} labelStyle={{ color: 'var(--text-secondary)', marginBottom: '4px' }} /><Bar dataKey="total" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} maxBarSize={isMobile ? 30 : 50} /></BarChart></ResponsiveContainer></div>
+                       {modalLoading ? (<div className="flex flex-col items-center justify-center h-full py-12 text-secondary"><Loader2 size={32} className="animate-spin mb-4 text-blue" /><p style={{fontSize: '13px'}}>Ստացվում են տվյալները...</p></div>) : (!modalData || !modalData.rawData || chartProcessedData.length === 0) ? (<div className="flex flex-col items-center justify-center h-full py-12 text-secondary"><AlertTriangle size={36} className="mb-4 text-orange-500" /><p className="font-bold text-lg">Վաճառքներ չկան</p></div>) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                              <div style={{ width: '100%', height: isMobile ? '250px' : '300px' }}><ResponsiveContainer width="100%" height="100%"><BarChart data={chartProcessedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" /><XAxis dataKey="date" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} tickMargin={10} axisLine={false} tickLine={false} tickFormatter={(val) => isMobile && chartProcessedData.length > 15 ? '' : val} /><YAxis tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(val) => val >= 1000 ? (val/1000).toFixed(1)+'k' : val} /><Tooltip cursor={{ fill: 'rgba(10, 132, 255, 0.05)' }} contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }} formatter={(value) => [formatNum(value) + ' հատ', 'Վաճառք']} labelStyle={{ color: 'var(--text-secondary)', marginBottom: '4px' }} /><Bar dataKey="total" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} maxBarSize={isMobile ? 30 : 50} /></BarChart></ResponsiveContainer></div>
+                              
+                              {/* Cities Distribution */}
+                              {modalData.cityData && modalData.cityData.length > 0 && (
+                                 <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                                    <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                       <Database size={16} className="text-secondary" /> Վաճառքներ ըստ Քաղաքների
+                                    </h3>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                                       {modalData.cityData.map((c, i) => {
+                                          const isActiveInFilter = filters.cities.length === 0 || filters.cities.includes(c.name);
+                                          const isSelectedInGraph = selectedGraphCities.includes(c.name);
+                                          const isOnlyOne = selectedGraphCities.length === 1 && selectedGraphCities[0] === c.name;
+
+                                          return (
+                                          <div 
+                                             key={i} 
+                                             onClick={() => {
+                                                setSelectedGraphCities(prev => {
+                                                   if (prev.includes(c.name)) {
+                                                      return prev.filter(name => name !== c.name);
+                                                   } else {
+                                                      return [...prev, c.name];
+                                                   }
+                                                });
+                                             }}
+                                             style={{ 
+                                                display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '10px', flex: '1 1 calc(33.333% - 12px)', minWidth: '140px', border: '1px solid', cursor: 'pointer', transition: 'all 0.2s', 
+                                                background: isSelectedInGraph ? 'var(--text-primary)' : 'var(--bg-primary)', 
+                                                borderColor: isSelectedInGraph ? 'var(--text-primary)' : 'var(--border-color)',
+                                                opacity: (selectedGraphCities.length > 0 && !isSelectedInGraph) ? 0.6 : 1
+                                             }}
+                                          >
+                                             <div style={{ width: '4px', height: '16px', background: isSelectedInGraph ? 'var(--bg-primary)' : 'var(--accent-blue)', borderRadius: '2px' }}></div>
+                                             <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '12px', color: isSelectedInGraph ? 'rgba(255,255,255,0.7)' : 'var(--text-secondary)', fontWeight: '600', display: 'flex', justifyContent: 'space-between' }}>
+                                                   {c.name}
+                                                   {isActiveInFilter && filters.cities.length > 0 && <span style={{fontSize: '8px', opacity: 0.8}}>ՖԻԼՏՐ</span>}
+                                                </div>
+                                                <div style={{ fontSize: '14px', color: isSelectedInGraph ? 'var(--bg-primary)' : 'var(--text-primary)', fontWeight: 'bold' }}>{formatNum(c.value)}</div>
+                                             </div>
+                                          </div>
+                                       )})}
+                                    </div>
+                                 </div>
+                              )}
+                          </div>
                        )}
                     </div>
                  </motion.div>

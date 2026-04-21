@@ -46,7 +46,19 @@ const Develop = () => {
 
   useEffect(() => {
     if (result) {
-      localStorage.setItem('sql_explorer_result', JSON.stringify(result));
+      try {
+        // Prevent caching massive datasets that crash the browser
+        const jsonStr = JSON.stringify(result);
+        if (jsonStr.length < 4000000) { // ~4MB safe limit
+          localStorage.setItem('sql_explorer_result', jsonStr);
+        } else {
+          localStorage.removeItem('sql_explorer_result');
+          console.warn('Dataset too large to cache in localStorage');
+        }
+      } catch (e) {
+        console.warn('Failed to save SQL results to localStorage', e);
+        localStorage.removeItem('sql_explorer_result');
+      }
     } else {
       localStorage.removeItem('sql_explorer_result');
     }
@@ -78,6 +90,7 @@ const Develop = () => {
     
     try {
       const api_url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const startTime = performance.now();
       const response = await fetch(`${api_url}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -85,10 +98,13 @@ const Develop = () => {
       });
       
       const resData = await response.json();
+      const executionTime = Math.round(performance.now() - startTime);
       
       if (!response.ok || resData.error) {
         throw new Error(resData.message || resData.error || 'Unknown error');
       }
+
+      resData.executionTimeMs = executionTime;
 
       setResult(resData);
     } catch (err) {
@@ -268,6 +284,11 @@ const Develop = () => {
                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-green)' }}></div>
                         <span style={{ fontSize: '14px', fontWeight: 'bold' }}>Արդյունք: {result.rowCount} տող</span>
+                        {result.executionTimeMs !== undefined && (
+                           <span style={{ fontSize: '12px', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '6px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={12} /> {result.executionTimeMs} մվ
+                           </span>
+                        )}
                      </div>
                      
                      {result.rows.length > 0 && (
