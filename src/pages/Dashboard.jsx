@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Loader2, Search, CheckCircle2, X, Calendar, Filter, ArrowUp, ArrowDown, Download, Layers, Database } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Loader2, Search, CheckCircle2, X, Calendar, Filter, ArrowUp, ArrowDown, Download, Layers, Database, ArrowUpDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getPromotions, getPromoProducts } from '../utils/promotions';
@@ -117,6 +117,7 @@ const Dashboard = () => {
   const hasActiveFilters = filters.periodAStart !== '' || 
     filters.diffPercentMin !== '' || filters.diffPercentMax !== '' || 
     filters.diffNumericMin !== '' || filters.diffNumericMax !== '';
+  const hasAnyFilter = hasActiveFilters || (filters.cities && filters.cities.length > 0);
 
   const openFilterModal = () => {
      setDraftFilters(filters);
@@ -1141,8 +1142,8 @@ const Dashboard = () => {
                       fontSize: '15px', 
                       fontWeight: 'bold', 
                       transition: 'all 0.2s', 
-                      background: viewMode === tab.id ? 'var(--text-primary)' : 'var(--bg-secondary)', 
-                      color: viewMode === tab.id ? 'var(--bg-primary)' : 'var(--text-secondary)', 
+                      background: viewMode === tab.id ? 'var(--accent-blue)' : 'var(--bg-secondary)', 
+                      color: viewMode === tab.id ? '#fff' : 'var(--text-secondary)', 
                       border: 'none',
                       boxShadow: 'none'
                     }}
@@ -1246,7 +1247,25 @@ const Dashboard = () => {
                         </div>
 
                         {/* Period B Select */}
-                        <div style={{ paddingTop: isMobile ? '12px' : '20px', borderTop: '1px dashed var(--border-color)' }}>
+                        <div style={{ paddingTop: isMobile ? '12px' : '20px', borderTop: '1px dashed var(--border-color)', position: 'relative' }}>
+                           <div style={{ position: 'absolute', top: isMobile ? '-16px' : '-18px', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
+                               <button 
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDraftFilters(prev => ({
+                                          ...prev,
+                                          periodAStart: prev.periodBStart,
+                                          periodAEnd: prev.periodBEnd,
+                                          periodBStart: prev.periodAStart,
+                                          periodBEnd: prev.periodAEnd
+                                      }));
+                                  }} 
+                                  title="Փոխել տեղերով" 
+                                  style={{ width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px', borderRadius: '50%', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}
+                               >
+                                   <ArrowUpDown size={isMobile ? 14 : 16} />
+                               </button>
+                           </div>
                            <label style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: isMobile ? '8px' : '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <Calendar size={18} style={{ color: 'var(--accent-orange)' }} />Ժամանակահատված 2
                            </label>
@@ -1320,7 +1339,7 @@ const Dashboard = () => {
                      </div>
                      <div style={{ padding: isMobile ? '12px 20px' : '20px 28px', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '12px' }}>
                         <button onClick={() => { clearFilters(); setIsFilterModalOpen(false); }} style={{ flex: 1, padding: isMobile ? '12px' : '16px', borderRadius: '18px', fontWeight: '900', fontSize: isMobile ? '14px' : '15px', background: 'rgba(255, 69, 58, 0.1)', color: 'var(--accent-red)', border: 'none' }}>Մաքրել</button>
-                        <button onClick={applyFilters} disabled={draftFilters.periodAStart && !draftFilters.periodAEnd} style={{ flex: 2, padding: isMobile ? '12px' : '16px', borderRadius: '18px', fontWeight: '900', fontSize: isMobile ? '14px' : '15px', background: 'var(--accent-blue)', color: 'white', border: 'none', opacity: (draftFilters.periodAStart && !draftFilters.periodAEnd) ? 0.5 : 1 }}>Կիրառել</button>
+                        <button onClick={applyFilters} disabled={(draftFilters.periodAStart && !draftFilters.periodAEnd) || (!draftFilters.periodAStart && draftFilters.periodBStart)} style={{ flex: 2, padding: isMobile ? '12px' : '16px', borderRadius: '18px', fontWeight: '900', fontSize: isMobile ? '14px' : '15px', background: 'var(--accent-blue)', color: 'white', border: 'none', opacity: ((draftFilters.periodAStart && !draftFilters.periodAEnd) || (!draftFilters.periodAStart && draftFilters.periodBStart)) ? 0.5 : 1 }}>Կիրառել</button>
                      </div>
                   </motion.div>
                </motion.div>
@@ -1333,21 +1352,20 @@ const Dashboard = () => {
                      <div style={{ flex: 1, display: 'flex', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '16px', border: '1px solid var(--border-color)', height: '48px', alignItems: 'center' }}>
                         <button 
                            onClick={() => setAnalyticsMode('categories')}
-                           style={{ flex: 1, height: '100%', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: analyticsMode === 'categories' ? 'var(--text-primary)' : 'transparent', color: analyticsMode === 'categories' ? 'var(--bg-primary)' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none' }}>
+                           style={{ flex: 1, height: '100%', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: analyticsMode === 'categories' ? 'var(--accent-blue)' : 'transparent', color: analyticsMode === 'categories' ? '#fff' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none' }}>
                            Կատեգորիաներ
                         </button>
                         <button 
                            onClick={() => setAnalyticsMode('products')}
-                           style={{ flex: 1, height: '100%', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: analyticsMode === 'products' ? 'var(--text-primary)' : 'transparent', color: analyticsMode === 'products' ? 'var(--bg-primary)' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none' }}>
+                           style={{ flex: 1, height: '100%', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: analyticsMode === 'products' ? 'var(--accent-blue)' : 'transparent', color: analyticsMode === 'products' ? '#fff' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none' }}>
                            Պրոդուկտներ
                         </button>
                      </div>
-                     {hasActiveFilters && (<button onClick={clearFilters} className="flex items-center justify-center bg-[rgba(255,69,58,0.1)] text-[#FF453A] shrink-0" style={{ width: '48px', height: '48px', borderRadius: '16px' }}><X size={20} strokeWidth={3} /></button>)}
                   </div>
                   
                   <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '16px', border: '1px solid var(--border-color)', minHeight: '48px' }}>
                      {[{ id: 'all', label: 'Բոլորը' }, { id: 'growth', label: 'Աճ' }, { id: 'decline', label: 'Անկում' }].map(tab => (
-                        <button key={tab.id} onClick={() => setViewMode(tab.id)} style={{ flex: 1, padding: '10px 8px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: viewMode === tab.id ? 'var(--text-primary)' : 'transparent', color: viewMode === tab.id ? 'var(--bg-primary)' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s', boxShadow: viewMode === tab.id ? '0 4px 12px rgba(0,0,0,0.1)' : 'none' }}>{tab.label}</button>
+                        <button key={tab.id} onClick={() => setViewMode(tab.id)} style={{ flex: 1, padding: '10px 8px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold', background: viewMode === tab.id ? 'var(--accent-blue)' : 'transparent', color: viewMode === tab.id ? '#fff' : 'var(--text-secondary)', border: 'none', transition: 'all 0.2s', boxShadow: viewMode === tab.id ? '0 4px 12px rgba(0,0,0,0.1)' : 'none' }}>{tab.label}</button>
                      ))}
                   </div>
 
@@ -1371,12 +1389,10 @@ const Dashboard = () => {
                         <Search size={18} className="text-secondary" />
                         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Որոնել..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', marginLeft: '10px', fontSize: '14px', width: '100%', height: '100%' }} />
                      </div>
-                     <button onClick={openFilterModal} className="glass-card flex items-center justify-center relative hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: hasActiveFilters ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: hasActiveFilters ? '#fff' : 'var(--text-primary)' }}><Filter size={20} fill={hasActiveFilters ? "currentColor" : "none"} />{hasActiveFilters && <div className="absolute top-[10px] right-[10px] w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--accent-blue)]"></div>}</button>
+                     <button onClick={openFilterModal} className="glass-card flex items-center justify-center relative hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: hasAnyFilter ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: hasAnyFilter ? '#fff' : 'var(--text-primary)' }}><Filter size={20} fill={hasAnyFilter ? "currentColor" : "none"} />{hasAnyFilter && <div className="absolute top-[10px] right-[10px] w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--accent-blue)]"></div>}</button>
+                     {hasAnyFilter && (<button onClick={clearFilters} className="glass-card flex items-center justify-center relative hover-lift shrink-0 bg-[rgba(255,69,58,0.1)] text-[#FF453A]" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, border: 'none' }}><X size={20} strokeWidth={3} /></button>)}
                      <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="glass-card flex items-center justify-center hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
                        {sortOrder === 'desc' ? <ArrowDown size={20} /> : <ArrowUp size={20} />}
-                     </button>
-                     <button onClick={downloadExcel} className="glass-card flex items-center justify-center relative hover-lift shrink-0" style={{ height: '48px', width: '48px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                        <Download size={20} />
                      </button>
                   </div>
                </div>
@@ -1385,12 +1401,12 @@ const Dashboard = () => {
                   <div style={{ display: 'flex', background: 'var(--bg-secondary)', padding: '6px', borderRadius: '20px', border: '1px solid var(--border-color)', height: '54px', alignItems: 'center' }}>
                      <button 
                         onClick={() => setAnalyticsMode('categories')}
-                        style={{ padding: '0 20px', height: '100%', borderRadius: '14px', fontSize: '14px', fontWeight: 'bold', background: analyticsMode === 'categories' ? 'var(--text-primary)' : 'transparent', color: analyticsMode === 'categories' ? 'var(--bg-primary)' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        style={{ padding: '0 20px', height: '100%', borderRadius: '14px', fontSize: '14px', fontWeight: 'bold', background: analyticsMode === 'categories' ? 'var(--accent-blue)' : 'transparent', color: analyticsMode === 'categories' ? '#fff' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         Կատեգորիաներ
                      </button>
                      <button 
                         onClick={() => setAnalyticsMode('products')}
-                        style={{ padding: '0 20px', height: '100%', borderRadius: '14px', fontSize: '14px', fontWeight: 'bold', background: analyticsMode === 'products' ? 'var(--text-primary)' : 'transparent', color: analyticsMode === 'products' ? 'var(--bg-primary)' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        style={{ padding: '0 20px', height: '100%', borderRadius: '14px', fontSize: '14px', fontWeight: 'bold', background: analyticsMode === 'products' ? 'var(--accent-blue)' : 'transparent', color: analyticsMode === 'products' ? '#fff' : 'var(--text-secondary)', transition: 'all 0.2s', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         Պրոդուկտներ
                      </button>
                   </div>
@@ -1401,8 +1417,8 @@ const Dashboard = () => {
                   </div>
 
                   <div className="flex items-center gap-2">
-                     {hasActiveFilters && (<button onClick={clearFilters} className="flex items-center justify-center bg-[rgba(255,69,58,0.1)] text-[#FF453A] hover:bg-[rgba(255,69,58,0.2)] transition-colors" style={{ width: '36px', height: '36px', borderRadius: '50%' }}><X size={16} strokeWidth={3} /></button>)}
-                     <button onClick={openFilterModal} className="glass-card flex items-center justify-center relative hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: hasActiveFilters ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: hasActiveFilters ? '#fff' : 'var(--text-primary)' }}><Filter size={22} fill={hasActiveFilters ? "currentColor" : "none"} />{hasActiveFilters && <div className="absolute top-[12px] right-[14px] w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--accent-blue)]"></div>}</button>
+                     <button onClick={openFilterModal} className="glass-card flex items-center justify-center relative hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: hasAnyFilter ? 'var(--accent-blue)' : 'var(--bg-secondary)', color: hasAnyFilter ? '#fff' : 'var(--text-primary)' }}><Filter size={22} fill={hasAnyFilter ? "currentColor" : "none"} />{hasAnyFilter && <div className="absolute top-[12px] right-[14px] w-2.5 h-2.5 rounded-full bg-white border-2 border-[var(--accent-blue)]"></div>}</button>
+                     {hasAnyFilter && (<button onClick={clearFilters} className="glass-card flex items-center justify-center relative hover-lift shrink-0 bg-[rgba(255,69,58,0.1)] text-[#FF453A]" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, border: 'none' }}><X size={22} strokeWidth={3} /></button>)}
                      <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="glass-card flex items-center justify-center hover-lift" style={{ height: '54px', width: '54px', borderRadius: '16px', padding: 0, background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
                        {sortOrder === 'desc' ? <ArrowDown size={22} /> : <ArrowUp size={22} />}
                      </button>
